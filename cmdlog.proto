@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package cmdlog;
+
+option go_package = "github.com/willrabalais/terminalLog/api/cmdlog;cmdlog";
+
+message LogEntry {
+  string command = 1;
+  int32 exit_code = 2;
+  int64 timestamp = 3;
+  int32 shell_pid = 4;
+  int64 shell_uptime = 5;
+  string working_directory = 6;
+  string prev_working_directory = 7;
+  string user = 8;
+  int32 euid = 9;
+  string term = 10;
+  string hostname = 11;
+  string ssh_client = 12;
+  string tty = 13;
+  bool is_git_repo = 14;
+  string git_repo_root = 15;
+  string git_branch = 16;
+  string git_commit = 17;
+  string git_status = 18;
+  bool logged_successfully = 19;
+}
