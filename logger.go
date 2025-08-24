@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"log"
 	"os"
@@ -11,7 +11,6 @@ import (
 
 	pb "github.com/WillRabalais04/terminalLog/api/gen"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 func main() {
@@ -75,73 +74,95 @@ func main() {
 		log.Fatalf("failed to create log directory: %v", err)
 	}
 
-	// testWithJSON(entry, getProjectRoot(homeDir)) // test by logging json files in this directory
+	logJSON(entry, getProjectRoot(homeDir)) // test by logging json files in this directory
 
 	// marshalled proto files to feed to kafka later
-	data, err := proto.Marshal(entry)
+	// data, err := proto.Marshal(entry)
 
-	if err != nil {
-		log.Fatalf("failed to marshal: %v", err)
-	}
+	// if err != nil {
+	// 	log.Fatalf("failed to marshal: %v", err)
+	// }
 
-	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		log.Fatalf("failed to open file: %v", err)
-	}
-	defer file.Close()
+	// file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	// if err != nil {
+	// 	log.Fatalf("failed to open file: %v", err)
+	// }
+	// defer file.Close()
 
-	size := uint32(len(data))
-	if err := binary.Write(file, binary.LittleEndian, size); err != nil {
-		log.Fatalf("failed to write length: %v", err)
-	}
-	if _, err := file.Write(data); err != nil {
-		log.Fatalf("failed to write data: %v", err)
-	}
+	// size := uint32(len(data))
+	// if err := binary.Write(file, binary.LittleEndian, size); err != nil {
+	// 	log.Fatalf("failed to write length: %v", err)
+	// }
+	// if _, err := file.Write(data); err != nil {
+	// 	log.Fatalf("failed to write data: %v", err)
+	// }
 
 }
 
-func testWithJSON(newEntry *pb.LogEntry, projectDir string) {
+func logJSON(newEntry *pb.LogEntry, projectDir string) {
 
 	testLogsDir := filepath.Join(projectDir, "testing", "logs")
-	testLogFile := filepath.Join(testLogsDir, "logs.jsonl")
+	testLogFile := filepath.Join(testLogsDir, "logs.json")
 
 	if err := os.MkdirAll(testLogsDir, 0755); err != nil {
 		log.Fatalf("failed to create log directory: %v", err)
 	}
 
-	err := appendToJSONLines(newEntry, testLogFile)
-
+	err := writeToJSON(newEntry, testLogFile)
 	if err != nil {
 		log.Fatalf("failed to write updated log file: %v", err)
 	}
 }
-func appendToJSONLines(entry *pb.LogEntry, path string) error {
+
+// utils
+func writeToJSON(entry *pb.LogEntry, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
 
+	fileBytes, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	var entries []*pb.LogEntry
+	if len(fileBytes) > 0 {
+		var rawEntries []json.RawMessage
+		if err := json.Unmarshal(fileBytes, &rawEntries); err != nil {
+			return err
+		}
+
+		for _, rawEntry := range rawEntries {
+			var logEntry pb.LogEntry
+			if err := protojson.Unmarshal(rawEntry, &logEntry); err != nil {
+				return err
+			}
+			entries = append(entries, &logEntry)
+		}
+	}
+
+	entries = append(entries, entry)
+
+	var rawEntriesToMarshal []json.RawMessage
 	m := protojson.MarshalOptions{
 		EmitUnpopulated: true,
 	}
-	jsonData, err := m.Marshal(entry)
+
+	for _, e := range entries {
+		jsonData, err := m.Marshal(e)
+		if err != nil {
+			return err
+		}
+		rawEntriesToMarshal = append(rawEntriesToMarshal, jsonData)
+	}
+
+	finalJSONData, err := json.MarshalIndent(rawEntriesToMarshal, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	if _, err := file.Write(append(jsonData, '\n')); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(path, finalJSONData, 0644)
 }
-
-// utils
 
 func getProjectRoot(homeDir string) string {
 	configPath := filepath.Join(homeDir, ".termlogger", "project_root")
