@@ -25,3 +25,11 @@ message LogEntry {
   string git_status = 18;
   bool logged_successfully = 19;
 }
+
+service LogService {
+  rpc Log(LogEntry) returns (LogResponse);
+}
+
+message LogResponse {
+  bool success = 1;
+}
