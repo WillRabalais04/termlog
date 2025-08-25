@@ -9,12 +9,15 @@ import (
 	"time"
 
 	gen "github.com/WillRabalais04/terminalLog/api/gen"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	grpc_adapter "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
 )
 
 func main() {
-	conn, err := grpc.NewClient("localhost:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	conn, err := grpc_adapter.NewClient(ctx, "localhost:9090")
+
+	// grpc.NewClient("localhost:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
