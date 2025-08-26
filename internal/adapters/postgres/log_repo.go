@@ -5,21 +5,20 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 
-	_ "github.com/Masterminds/squirrel"
+	sq "github.com/Masterminds/squirrel"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-type Repository struct {
+type LogRepo struct {
 	db *sql.DB
+	sb sq.StatementBuilderType
 }
 
 func InitDB(dbURL string) (*sql.DB, error) {
-	// func InitDB(host string, port int, user, password, dbname string) (*sql.DB, error) {
-	// dsn := fmt.Sprintf(dbURL)
-	// , host, port, user, password, dbname)
 
 	db, err := sql.Open("pgx", dbURL) // pgx driver faster than pg driver
 	if err != nil {
@@ -33,7 +32,7 @@ func InitDB(dbURL string) (*sql.DB, error) {
 	return db, nil
 }
 
-func NewRepository(db *sql.DB) (*Repository, error) {
+func NewRepository(db *sql.DB) (*LogRepo, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("unable to ping database: %w", err)
 	}
@@ -48,16 +47,51 @@ func NewRepository(db *sql.DB) (*Repository, error) {
 		}
 	}
 
-	return &Repository{db: db}, nil
+	return &LogRepo{db: db, sb: sq.StatementBuilder.PlaceholderFormat(sq.Dollar)}, nil
 }
 
-func (r *Repository) Save(log domain.LogEntry) error {
-	return nil
+func (r *LogRepo) Save(entry domain.LogEntry) error {
+	query := r.sb.Insert("logs").
+		Columns(
+			"command", "exit_code", "ts", "shell_pid", "shell_uptime", "cwd",
+			"prev_cwd", "user_name", "euid", "term", "hostname", "ssh_client",
+			"tty", "git_repo", "git_repo_root", "git_branch", "git_commit",
+			"git_status", "logged_successfully",
+		).
+		Values(
+			entry.Command,
+			entry.ExitCode,
+			time.Unix(entry.Timestamp, 0),
+			entry.Shell_PID,
+			entry.ShellUptime,
+			entry.WorkingDirectory,
+			entry.PrevWorkingDirectory,
+			entry.User,
+			entry.EUID,
+			entry.Term,
+			entry.Hostname,
+			entry.SSHClient,
+			entry.TTY,
+			entry.IsGitRepo,
+			entry.GitRepoRoot,
+			entry.GitBranch,
+			entry.GitCommit,
+			entry.GitStatus,
+			entry.LoggedSuccessfully,
+		)
+
+	sqlStr, args, err := query.ToSql()
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(sqlStr, args...)
+	return err
 }
 
-func (r *Repository) Get(id int) (domain.LogEntry, error) {
+func (r *LogRepo) Get(id int) (domain.LogEntry, error) {
 	return domain.LogEntry{}, nil
 }
-func (r *Repository) List() ([]domain.LogEntry, error) {
+func (r *LogRepo) List() ([]domain.LogEntry, error) {
 	return nil, nil
 }

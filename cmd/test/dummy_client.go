@@ -34,13 +34,29 @@ func main() {
 		if text == "" || text == "exit" {
 			break
 		}
+
 		request := &gen.LogEntry{
-			Command:          text,
-			ExitCode:         0,
-			Timestamp:        time.Now().Unix(),
-			User:             "testuser",
-			WorkingDirectory: "/home/testuser",
+			Command:              text,
+			ExitCode:             0,
+			Timestamp:            time.Now().Unix(),
+			User:                 "dummy_client",
+			WorkingDirectory:     "/home/testuser",
+			Shell_PID:            0,
+			ShellUptime:          69,
+			PrevWorkingDirectory: "/home/prev",
+			EUID:                 0,
+			Term:                 "kitty",
+			Hostname:             "a",
+			SSHClient:            "b",
+			TTY:                  "tty01",
+			IsGitRepo:            false,
+			GitRepoRoot:          "asdf",
+			GitBranch:            "main",
+			GitCommit:            "2342aga",
+			GitStatus:            "no diff",
+			LoggedSuccessfully:   true,
 		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
 		response, err = client.Log(ctx, request)

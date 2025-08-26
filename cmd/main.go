@@ -19,14 +19,6 @@ import (
 	// print "github.com/WillRabalais04/terminalLog/internal/adapters/print"
 )
 
-// const (
-// 	host     = "localhost"
-// 	port     = 5433
-// 	user     = "postgres"
-// 	password = "password"
-// 	dbname   = "logs"
-// )
-
 const dbURL = "postgres://postgres:password@localhost:5433/logs?sslmode=disable"
 
 func main() {
@@ -36,6 +28,7 @@ func main() {
 		log.Fatalf("Failed to initialize db: %v", err)
 	}
 
+	// repo, err := print.NewAdapter() (db)
 	repo, err := pg.NewRepository(db)
 	if err != nil {
 		log.Fatalf("Failed to connect to repository: %v", err)
@@ -55,8 +48,8 @@ func main() {
 	gRPCServer := grpc.NewServer()
 	gen.RegisterLogServiceServer(gRPCServer, grpcAdapter)
 
+	log.Println("gRPC server listening on", listenPort)
 	go func() {
-		log.Println("gRPC server listening on", listenPort)
 		if err := gRPCServer.Serve(lis); err != nil {
 			log.Fatalf("failed to serve gRPC server: %v", err)
 		}
