@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS logs (
+  event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
+  command TEXT NOT NULL,
+  exit_code INT,
+  ts TIMESTAMPTZ NOT NULL,          
+  shell_pid INT,
+  shell_uptime BIGINT, 
+  cwd TEXT,     
+  prev_cwd TEXT,   
+  user_name TEXT,    
+  euid INT,                
+  term TEXT, 
+  hostname TEXT, 
+  ssh_client TEXT, 
+  tty TEXT,    
+  git_repo BOOLEAN, 
+  git_repo_root TEXT,  
+  git_branch TEXT, 
+  git_commit TEXT,  
+  git_status TEXT,
+  logged_successfully BOOLEAN  
+);

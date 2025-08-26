@@ -17,7 +17,6 @@ func main() {
 	defer cancel()
 	conn, err := grpc_adapter.NewClient(ctx, "localhost:9090")
 
-	// grpc.NewClient("localhost:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -32,7 +31,7 @@ func main() {
 	for {
 		fmt.Print("Enter text: ")
 		text, _ = reader.ReadString('\n')
-		if text == "" {
+		if text == "" || text == "exit" {
 			break
 		}
 		request := &gen.LogEntry{
@@ -42,13 +41,16 @@ func main() {
 			User:             "testuser",
 			WorkingDirectory: "/home/testuser",
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+
 		response, err = client.Log(ctx, request)
+		cancel()
+
 		if err != nil {
-			log.Fatalf("could not log: %v", err)
+			log.Printf("could not log: %v", err)
+		} else {
+			log.Printf("Server Response: Success=%t", response.GetSuccess())
 		}
-		log.Printf("Server Response: Success=%t", response.GetSuccess())
 	}
 
 }

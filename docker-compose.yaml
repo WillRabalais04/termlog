@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: logs
+    volumes:
+      - logs-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # get port and other vals from env later
+
+  migrate:
+    image: migrate/migrate
+    volumes:
+      - ./db/migrations:/migrations
+    command: [
+      "-path", "/migrations",
+      "-database", "postgres://postgres:password@db:5432/logs?sslmode=disable",
+      "up"
+    ]
+    depends_on:
+      - db
+
+volumes:
+  logs-data:
+  # api:
+  #   build: ./cmd
+  #   depends_on:
+  #     - db
+  #     - migrate
+  #   environment:
+  #     DATABASE_URL: postgres://postgres:password@db:5432/logs?sslmode=disable
+  #   ports:
+  #     - "8080:8080"

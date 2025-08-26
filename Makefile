@@ -175,6 +175,12 @@ proto:
 protoclean:
 	@rm -rf api/gen/*
 
+migrate-up:
+	docker-compose run --rm migrate
+
+migrate-down:
+	docker-compose run --rm migrate down 1
+
 help:
 	@echo "Usage: make [target]"
 	@echo ""

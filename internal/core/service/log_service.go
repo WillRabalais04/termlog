@@ -2,18 +2,18 @@ package service
 
 import (
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
-	"github.com/WillRabalais04/terminalLog/internal/ports"
+	"github.com/WillRabalais04/terminalLog/internal/core/ports"
 )
 
-type Service struct {
+type LogService struct {
 	repo ports.LogRepositoryPort
 }
 
-func New(repo ports.LogRepositoryPort) *Service {
-	return &Service{
+func NewLogService(repo ports.LogRepositoryPort) *LogService {
+	return &LogService{
 		repo: repo,
 	}
 }
-func (s *Service) Log(entry domain.LogEntry) error {
+func (s *LogService) Log(entry domain.LogEntry) error {
 	return s.repo.Save(entry)
 }

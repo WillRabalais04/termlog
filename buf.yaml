@@ -1,7 +1,6 @@
 version: v2
 modules:
   - path: api/proto/log
-
 lint:
   use:
     - DEFAULT
