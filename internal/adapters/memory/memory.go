@@ -1,4 +1,4 @@
-package print
+package memory
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 )
 
 type APIPort interface {
-	Log(entry domain.LogEntry) error
+	Log(entry *domain.LogEntry) error
 }
 
 type Adapter struct{}

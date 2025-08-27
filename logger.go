@@ -10,8 +10,14 @@ import (
 	"time"
 
 	pb "github.com/WillRabalais04/terminalLog/api/gen"
+	pg "github.com/WillRabalais04/terminalLog/internal/adapters/postgres"
+	"github.com/WillRabalais04/terminalLog/internal/core/domain"
+	"github.com/WillRabalais04/terminalLog/internal/core/service"
+
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+const dbURL = "postgres://postgres:password@localhost:5433/logs?sslmode=disable"
 
 func main() {
 
@@ -36,7 +42,29 @@ func main() {
 
 	flag.Parse()
 
-	entry := &pb.LogEntry{
+	// entry := &pb.LogEntry{
+	// 	Command:              *cmd,
+	// 	ExitCode:             int32(*exit),
+	// 	Timestamp:            *ts,
+	// 	Shell_PID:            int32(*spid),
+	// 	ShellUptime:          *uptime,
+	// 	WorkingDirectory:     *cwd,
+	// 	PrevWorkingDirectory: *oldpwd,
+	// 	User:                 *user,
+	// 	EUID:                 int32(*euid),
+	// 	Term:                 *term,
+	// 	Hostname:             *hostname,
+	// 	SSHClient:            *sshClient,
+	// 	TTY:                  *tty,
+	// 	IsGitRepo:            *isRepo,
+	// 	GitRepoRoot:          *gitRoot,
+	// 	GitBranch:            *gitBranch,
+	// 	GitCommit:            *gitCommit,
+	// 	GitStatus:            *gitStatus,
+	// 	LoggedSuccessfully:   true,
+	// }
+
+	entry := &domain.LogEntry{
 		Command:              *cmd,
 		ExitCode:             int32(*exit),
 		Timestamp:            *ts,
@@ -67,6 +95,25 @@ func main() {
 		log.Fatalf("failed to get home directory: %v", err)
 	}
 
+	db, err := pg.InitDB(dbURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize db: %v", err)
+	}
+
+	// repo, err := print.NewAdapter() (db)
+	repo, err := pg.NewRepository(db) // doesn't pass by api call yet but might in future
+	if err != nil {
+		log.Fatalf("Failed to connect to repository: %v\n Logging locally...", err)
+		// repo, err = print.NewAdapter()
+		if err != nil {
+			log.Fatalf("Could not cache logs locally (%v). Log lost...", err)
+		}
+	}
+
+	coreService := service.NewLogService(repo)
+	coreService.Log(entry)
+	// init services & adapters
+
 	logFile := filepath.Join(homeDir, ".termlogger", "logs", "logs.pb")
 
 	logDir := filepath.Dir(logFile)
@@ -74,7 +121,8 @@ func main() {
 		log.Fatalf("failed to create log directory: %v", err)
 	}
 
-	logJSON(entry, getProjectRoot(homeDir)) // test by logging json files in this directory
+	// test by logging json files in this directory
+	// logJSON(entry, getProjectRoot(homeDir))
 
 	// marshalled proto files to feed to kafka later
 	// data, err := proto.Marshal(entry)

@@ -14,6 +14,6 @@ func NewLogService(repo ports.LogRepositoryPort) *LogService {
 		repo: repo,
 	}
 }
-func (s *LogService) Log(entry domain.LogEntry) error {
+func (s *LogService) Log(entry *domain.LogEntry) error {
 	return s.repo.Save(entry)
 }

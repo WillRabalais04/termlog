@@ -2,7 +2,7 @@ SOURCE_FILE=./logger.go
 COMPILED_OUTPUT=./bin/logger
 INSTALL_PATH=/usr/local/bin/termlogger
 CONFIG_DIR=$(HOME)/.termlogger
-LOG_DIR=$(CONFIG_DIR)/logs
+LOG_DIR=$(CONFIG_DIR)/logcache
 TEST_LOG_DIR=./testing/logs
 BASH_RC=$(HOME)/.bashrc
 ZSH_RC=$(HOME)/.zshrc
@@ -53,12 +53,11 @@ sethook:
 		echo "❌ RC file not found. Hook not set."; \
 		exit 1; \
 	fi; \
-	echo "Found shell configuration file at '$$RC_FILE'"; \
 	cp "$$RC_FILE" "$$RC_FILE.backup.$(shell date +%s)"; \
 	TMP_FILE=$$(mktemp); \
 	sed '/### >>> termlogger start >>>/,/### <<< termlogger end <<</d' "$$RC_FILE" > "$$TMP_FILE"; \
 	mv "$$TMP_FILE" "$$RC_FILE"; \
-	echo "🪝 Installing/updating hook in '$$RC_FILE' ..."; \
+	echo "🪝 Installing/updating hook in '$$RC_FILE'..."; \
 	cat $(TERMLOGGER_HOOK_SCRIPT) >> "$$RC_FILE"; \
 	echo "✅ Hook installed/updated."
 	@rm -f $(COMPILED_OUTPUT)

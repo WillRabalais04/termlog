@@ -16,7 +16,7 @@ import (
 
 	pg "github.com/WillRabalais04/terminalLog/internal/adapters/postgres"
 	// prints outputs for testing purposes
-	// print "github.com/WillRabalais04/terminalLog/internal/adapters/print"
+	// memory "github.com/WillRabalais04/terminalLog/internal/adapters/memory"
 )
 
 const dbURL = "postgres://postgres:password@localhost:5433/logs?sslmode=disable"

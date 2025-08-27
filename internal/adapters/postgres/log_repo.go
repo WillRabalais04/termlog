@@ -50,7 +50,7 @@ func NewRepository(db *sql.DB) (*LogRepo, error) {
 	return &LogRepo{db: db, sb: sq.StatementBuilder.PlaceholderFormat(sq.Dollar)}, nil
 }
 
-func (r *LogRepo) Save(entry domain.LogEntry) error {
+func (r *LogRepo) Save(entry *domain.LogEntry) error {
 	query := r.sb.Insert("logs").
 		Columns(
 			"command", "exit_code", "ts", "shell_pid", "shell_uptime", "cwd",

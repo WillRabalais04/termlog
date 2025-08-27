@@ -5,5 +5,5 @@ import (
 )
 
 type APIPort interface {
-	Log(entry domain.LogEntry) error
+	Log(entry *domain.LogEntry) error
 }
