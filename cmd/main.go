@@ -10,26 +10,35 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
+	"github.com/joho/godotenv"
 
 	gen "github.com/WillRabalais04/terminalLog/api/gen"
 	gRPC "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
 
-	pg "github.com/WillRabalais04/terminalLog/internal/adapters/postgres"
-	// prints outputs for testing purposes
-	// memory "github.com/WillRabalais04/terminalLog/internal/adapters/memory"
+	postgres "github.com/WillRabalais04/terminalLog/internal/adapters/postgres"
+	sqlite "github.com/WillRabalais04/terminalLog/internal/adapters/sqlite"
+	// memory "github.com/WillRabalais04/terminalLog/internal/adapters/memory" // prints outputs for testing purposes
 )
 
 const dbURL = "postgres://postgres:password@localhost:5433/logs?sslmode=disable"
 
 func main() {
+	if err := godotenv.Load(".env.local"); err != nil {
+		log.Println("no .env.local found, using system env vars")
+	}
+	db, err := sqlite.InitDB(dbURL)
+	mode := os.Getenv("MODE")
+	if mode == "org" {
+		db, err = postgres.InitDB(dbURL)
+	}
+
 	// init / connect to DB
-	db, err := pg.InitDB(dbURL)
 	if err != nil {
 		log.Fatalf("Failed to initialize db: %v", err)
 	}
 
 	// repo, err := print.NewAdapter() (db)
-	repo, err := pg.NewRepository(db)
+	repo, err := postgres.NewRepository(db)
 	if err != nil {
 		log.Fatalf("Failed to connect to repository: %v", err)
 	}

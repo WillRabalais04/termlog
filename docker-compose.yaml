@@ -9,7 +9,6 @@ services:
       - logs-data:/var/lib/postgresql/data
     ports:
       - "5433:5432" # get port and other vals from env later
-
   migrate:
     image: migrate/migrate
     volumes:
@@ -21,6 +20,27 @@ services:
     ]
     depends_on:
       - db
+  # kafka: # will implement multi user mode with kafka later
+  #   image: apache/kafka:3.9.1
+  #   container_name: kafka
+  #   ports:
+  #     - "9092:9092"   # broker aka client
+  #     - "9093:9093"   # controller
+  #   environment:
+  #     KAFKA_NODE_ID: 1
+  #     KAFKA_PROCESS_ROLES: broker,controller
+  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+  #     KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+
+  #     KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+  #     KAFKA_CLUSTER_ID: "my-cluster-id"
+    
+  #   volumes:
+  #     - ./data/kafka:/tmp/kraft-combined-logs
 
 volumes:
   logs-data:

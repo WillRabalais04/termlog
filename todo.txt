@@ -1,0 +1,2 @@
+features: 
+- add pause/resume logging functionality

@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS logs (
+  event_id INTEGER PRIMARY KEY AUTOINCREMENT, 
+  command TEXT NOT NULL,
+  exit_code INTEGER,
+  ts TEXT NOT NULL,          
+  shell_pid INTEGER,
+  shell_uptime INTEGER, 
+  cwd TEXT,     
+  prev_cwd TEXT,   
+  user_name TEXT,    
+  euid INTEGER,                
+  term TEXT, 
+  hostname TEXT, 
+  ssh_client TEXT, 
+  tty TEXT,
+  git_repo INTEGER, 
+  git_repo_root TEXT,  
+  git_branch TEXT, 
+  git_commit TEXT,  
+  git_status TEXT,
+  logged_successfully INTEGER  
+);
