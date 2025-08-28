@@ -1,5 +1,5 @@
-SOURCE_FILE=./logger.go
-COMPILED_OUTPUT=./bin/logger
+SOURCE_FILE=./cmd/logger.go
+COMPILED_OUTPUT=./cmd/bin/logger
 INSTALL_PATH=/usr/local/bin/termlogger
 CONFIG_DIR=$(HOME)/.termlogger
 LOG_DIR=$(CONFIG_DIR)/logcache

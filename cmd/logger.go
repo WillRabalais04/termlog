@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	pb "github.com/WillRabalais04/terminalLog/api/gen"
-	pg "github.com/WillRabalais04/terminalLog/internal/adapters/postgres"
+	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
 
@@ -95,24 +98,53 @@ func main() {
 		log.Fatalf("failed to get home directory: %v", err)
 	}
 
-	db, err := pg.InitDB(dbURL)
-	if err != nil {
-		log.Fatalf("Failed to initialize db: %v", err)
-	}
+	// db, err := database.InitDB(&database.Config{
+	// 	Driver:     "sqlite3",
+	// 	DataSource: "./data.db",
+	// 	SchemaFile: "db/sqlite/000001_create_logs_table.up.sql",
+	// })
+	// if err != nil {
+	// 	log.Fatalf("Failed to initialize db: %v", err)
+	// }
 
 	// repo, err := print.NewAdapter() (db)
-	repo, err := pg.NewRepository(db) // doesn't pass by api call yet but might in future
-	if err != nil {
-		log.Fatalf("Failed to connect to repository: %v\n Logging locally...", err)
-		// repo, err = print.NewAdapter()
-		if err != nil {
-			log.Fatalf("Could not cache logs locally (%v). Log lost...", err)
-		}
-	}
-
-	coreService := service.NewLogService(repo)
-	coreService.Log(entry)
+	// repo, err := database.NewRepo(&database.Config{
+	// 	Driver:     "sqlite3",
+	// 	DataSource: "./data.db",
+	// 	SchemaFile: "db/sqlite/000001_create_logs_table.up.sql",
+	// })
+	// coreService := service.NewLogService(repo)
+	// coreService.Log(entry)
 	// init services & adapters
+
+	cacheRepo, err := database.NewRepo(&database.Config{ // add error handlng and clean up a lot
+		Driver:     "sqlite3",
+		DataSource: "./data.db",
+		SchemaFile: "db/sqlite/000001_create_logs_table.up.sql",
+	})
+
+	var svc *service.LogService
+
+	isOrgMode, err := strconv.ParseBool(os.Getenv("ORG_MODE"))
+	if isOrgMode {
+		remoteRepo, err := database.NewRepo(&database.Config{
+			Driver:     "pgx",
+			DataSource: getDSN(),
+			SchemaFile: "db/migrations/postgres/000001_create_logs_table.up.sql",
+		})
+		if err != nil {
+			log.Fatalf("couldn't access remote log repo: %v", err)
+		}
+		multiRepo := database.NewMultiRepo(cacheRepo, remoteRepo)
+		svc = service.NewLogService(multiRepo)
+
+	} else {
+		svc = service.NewLogService(cacheRepo)
+
+	}
+	ctx, _ := context.WithTimeout(context.Background(), time.Second) // figure this out
+
+	svc.Log(ctx, entry)
 
 	logFile := filepath.Join(homeDir, ".termlogger", "logs", "logs.pb")
 
@@ -219,4 +251,25 @@ func getProjectRoot(homeDir string) string {
 		log.Fatalf("failed to read project root config: %v", err)
 	}
 	return strings.TrimSpace(string(projectRootBytes))
+}
+
+func getDSN() string {
+	host := getEnvOrDefault("DB_HOST", "localhost")
+	port := getEnvOrDefault("DB_PORT", "5432")
+	user := getEnvOrDefault("DB_USER", "postgres")
+	password := getEnvOrDefault("DB_PASSWORD", "")
+	dbname := getEnvOrDefault("DB_NAME", "terminallog")
+	sslmode := getEnvOrDefault("DB_SSLMODE", "disable")
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
+
+	return dsn
+}
+
+func getEnvOrDefault(key, defaultVal string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultVal
 }
