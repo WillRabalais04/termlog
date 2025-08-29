@@ -1,2 +1,7 @@
+core functionality:
+- add api
+    - implement actual querying beyond list 
+- clean up makefile
+- org mode
 features: 
 - add pause/resume logging functionality

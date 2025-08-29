@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
@@ -20,9 +19,9 @@ type LogRepo struct {
 }
 
 type Config struct {
-	Driver     string
-	DataSource string
-	SchemaFile string
+	Driver       string
+	DataSource   string
+	SchemaString string
 }
 
 func InitDB(driver, dataSource string) (*sql.DB, error) {
@@ -56,11 +55,7 @@ func NewRepo(cfg *Config) (*LogRepo, error) {
 		return nil, fmt.Errorf("failed to init db: %v", err)
 	}
 
-	schema, err := os.ReadFile(cfg.SchemaFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read schema file %s: %w", cfg.SchemaFile, err)
-	}
-	if _, err := db.Exec(string(schema)); err != nil {
+	if _, err := db.Exec(string(cfg.SchemaString)); err != nil {
 		return nil, fmt.Errorf("failed to execute schema: %w", err)
 	}
 

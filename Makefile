@@ -1,21 +1,21 @@
 SOURCE_FILE=./cmd/logger.go
-COMPILED_OUTPUT=./cmd/bin/logger
+BIN_DIR=./cmd/bin/
 INSTALL_PATH=/usr/local/bin/termlogger
 CONFIG_DIR=$(HOME)/.termlogger
-LOG_DIR=$(CONFIG_DIR)/logcache
-TEST_LOG_DIR=./testing/logs
+CACHE_PATH=$(CONFIG_DIR)/cache.db
+TEST_CACHE=./testing/logs
 BASH_RC=$(HOME)/.bashrc
 ZSH_RC=$(HOME)/.zshrc
 PROJECT_ROOT=$(shell pwd)
 TERMLOGGER_HOOK_SCRIPT=./hooks/termlogger_hook.sh
 REMOVE_HOOK_SCRIPT=./hooks/remove_hook.sh
 
-.PHONY: all clean cleanml cleantl configdir help logbin logdir proto protoclean removebin removeconfigdir removehook setbin sethook setup testlogdir uninstall
+.PHONY: all clean cleanml cleantl configdir help logbin proto protoclean removebin removeconfigdir removehook setbin sethook setup testlogdir uninstall
 all: help
 
 logbin:
 	@echo "📦 Compiling logger..."
-	@if ! go build -o $(COMPILED_OUTPUT) $(SOURCE_FILE); then \
+	@if ! go build -o $(BIN_DIR) $(SOURCE_FILE); then \
 		echo "❌ Compilation failed."; \
 		exit 1; \
 	fi
@@ -24,7 +24,7 @@ logbin:
 setbin: logbin
 	@echo "🚀 Installing binary in '$(INSTALL_PATH)'..."
 	@sudo mkdir -p "$(shell dirname $(INSTALL_PATH))"
-	@sudo cp "$(COMPILED_OUTPUT)" "$(INSTALL_PATH)"
+	@sudo cp "$(BIN_DIR)/logger" "$(INSTALL_PATH)"
 	@echo "✅ Binary installed successfully."
 
 configdir:
@@ -32,16 +32,10 @@ configdir:
 	@mkdir -p "$(CONFIG_DIR)"
 	@echo "✅ Config directory successfully created."
 	@echo "$(PROJECT_ROOT)" > "$(CONFIG_DIR)/project_root"
-	@$(MAKE) logdir
-
-logdir:
-	@echo "🔧 Creating log directory at '$(LOG_DIR)'..."
-	@mkdir -p "$(LOG_DIR)"
-	@echo "✅ Log directory successfully created."
-
+	
 testlogdir:
-	@echo "🔧 Creating testing log directory at '$(TEST_LOG_DIR)'..."
-	@mkdir -p "$(TEST_LOG_DIR)"
+	@echo "🔧 Creating testing log directory at '$(TEST_CACHE)'..."
+	@mkdir -p "$(TEST_CACHE)"
 	@echo "✅ Test log directory successfully created."
 
 sethook:
@@ -60,11 +54,11 @@ sethook:
 	echo "🪝 Installing/updating hook in '$$RC_FILE'..."; \
 	cat $(TERMLOGGER_HOOK_SCRIPT) >> "$$RC_FILE"; \
 	echo "✅ Hook installed/updated."
-	@rm -f $(COMPILED_OUTPUT)
+	@rm -r $(BIN_DIR)
 
 setup:
 	@echo "🚀  Starting setup..."
-	@$(MAKE) proto
+
 	@$(MAKE) configdir
 	@$(MAKE) setbin
 	@$(MAKE) testlogdir
@@ -110,8 +104,9 @@ removehook:
 removeconfigdir:
 	@if [ -d "$(CONFIG_DIR)" ]; then \
 		echo "⛔️ Found configuration and log directory at '$(CONFIG_DIR)'."; \
-		read -p "❓ Do you want to permanently delete this directory? [y/n] " response; \
-		if [ "$$response" = "y" ] || [ "$$response" = "Y" ] || [ "$$response" = "yes" ] || [ "$$response" = "YES" ]; then \
+		read -p "❓ Do you want to permanently delete this directory? [y/n] "  -n 1 -r; \
+		echo ""; \
+		if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
 			if rm -rf "$(CONFIG_DIR)"; then \
 				echo "✅ Directory '$(CONFIG_DIR)' removed."; \
 			else \
@@ -137,34 +132,34 @@ clean:
 	@$(MAKE) protoclean
 
 cleanml:
-	@if [ -d "$(LOG_DIR)" ]; then \
-		read -p "❓ Do you want to delete all of the main logs? (y/n) " -n 1 -r; \
+	@if [ -d "$(CACHE_PATH)" ]; then \
+		read -p "❓ Do you want to delete all of the main logs? [y/n] " -n 1 -r; \
 		echo ""; \
 		if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-			echo "🗑️  Deleting contents of '$(LOG_DIR)'..."; \
-			find "$(LOG_DIR)" -mindepth 1 -delete; \
+			echo "🗑️  Deleting contents of '$(CACHE_PATH)'..."; \
+			@rm -r $(CACHE_PATH)
 			echo "✅ Deletion complete."; \
 		else \
 			echo "⏩ Skipping deletion."; \
 		fi; \
 	else \
-		echo "🤔 Log directory '$(LOG_DIR)' not found."; \
+		echo "🤔 Log cache '$(CACHE_PATH)' not found."; \
 		echo "✅ Nothing to remove!"; \
 	fi
 
 cleantl:
-	@if [ -d "$(TEST_LOG_DIR)" ]; then \
-		read -p "❓ Do you want to delete all of the testing logs? (y/n) " -n 1 -r; \
+	@if [ -d "$(TEST_CACHE)" ]; then \
+		read -p "❓ Do you want to delete all of the testing logs? [y/n] " -n 1 -r; \
 		echo ""; \
 		if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
-			echo "🗑️  Deleting contents of '$(TEST_LOG_DIR)'..."; \
-			find "$(TEST_LOG_DIR)" -mindepth 1 -delete; \
+			echo "🗑️  Deleting contents of '$(TEST_CACHE)'..."; \
+			find "$(TEST_CACHE)" -mindepth 1 -delete; \
 			echo "✅ Deletion complete."; \
 		else \
 			echo "⏩ Skipping deletion."; \
 		fi; \
 	else \
-		echo "🤔 Test log directory '$(TEST_LOG_DIR)' not found."; \
+		echo "🤔 Test log directory '$(TEST_CACHE)' not found."; \
 		echo "✅ Nothing to remove!"; \
 	fi
 
@@ -188,7 +183,6 @@ help:
 	@echo "  logbin          Compiles the logger Go source file."
 	@echo "  setbin          Places the compiled binary into the user's binary folder."
 	@echo "  configdir       Creates the configuration directory."
-	@echo "  logdir          Creates the main log directory."
 	@echo "  testlogdir      Creates the testing log directory."
 	@echo "  sethook         Installs the shell hook for termlogger."
 	@echo "  setup           Builds and installs the termlogger binary and shell hook."

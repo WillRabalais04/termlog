@@ -19,6 +19,6 @@ func NewAdapter(api ports.APIPort) *Adapter {
 
 func (a *Adapter) Log(ctx context.Context, req *log.LogEntry) (*log.LogResponse, error) {
 	entry := domain.ReqToDomainLogEntry(req)
-	err := a.api.Log(&entry)
+	err := a.api.Log(ctx, &entry)
 	return &log.LogResponse{Success: err == nil}, err
 }

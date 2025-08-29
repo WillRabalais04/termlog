@@ -12,5 +12,3 @@ type LogRepositoryPort interface {
 	List(ctx context.Context) ([]domain.LogEntry, error)
 	// add delete and clear functions
 }
-
-

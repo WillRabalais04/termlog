@@ -17,9 +17,12 @@ func NewMultiRepo(cache, remote *LogRepo) *MultiRepo {
 }
 
 func (r *MultiRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
-	if err := r.remote.Log(ctx, entry); err != nil {
-		_ = r.cache.Log(ctx, entry)
-		return fmt.Errorf("cached log due to remote repo failure: %w", err)
+	if errRemote := r.remote.Log(ctx, entry); errRemote != nil {
+		errCache := r.cache.Log(ctx, entry)
+		if errCache != nil {
+			return fmt.Errorf("logging failed at remote (%v) AND in cache (%v)", errRemote, errCache)
+		}
+		return fmt.Errorf("cached log due to remote repo failure: %w", errRemote)
 	}
 	return nil
 }

@@ -1,4 +1,4 @@
-package logger_test
+package main
 
 import (
 	"fmt"
@@ -6,58 +6,49 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 
 	"google.golang.org/grpc"
 
-	"github.com/WillRabalais04/terminalLog/internal/core/service"
 	"github.com/joho/godotenv"
 
 	gen "github.com/WillRabalais04/terminalLog/api/gen"
 
-	// postgres "github.com/WillRabalais04/terminalLog/internal/adapters/postgres"
-	database "github.com/WillRabalais04/terminalLog/internal/adapters/db"
+	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
+	gRPC "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
+	"github.com/WillRabalais04/terminalLog/internal/core/service"
 	// memory "github.com/WillRabalais04/terminalLog/internal/adapters/memory" // prints outputs for testing purposes
 )
 
 func main() {
 
-	if err := godotenv.Load("../.env.local"); err != nil {
-		log.Println("no .env.local found, using system env vars")
+	if err := godotenv.Load(".env.org"); err != nil {
+		log.Println("no cmd/server/.env.org found, using system env vars")
 	}
 
 	cache, err := database.NewRepo(&database.Config{
 		Driver:     "sqlite3",
 		DataSource: "./data.db",
-		SchemaFile: "db/migrations/sqlite/000001_create_logs_table.up.sql",
+		SchemaString: "db/migrations/sqlite/000001_create_logs_table.up.sql",
 	})
 	if err != nil {
 		log.Fatalf("couldn't access log cache: %v", err)
 	}
-
-	isOrgMode, err := strconv.ParseBool(os.Getenv("ORG_MODE"))
-	if isOrgMode {
-		remoteDB, err := database.NewRepo(&database.Config{
-			Driver:     "pgx",
-			DataSource: getDSN(),
-			SchemaFile: "db/migrations/postgres/000001_create_logs_table.up.sql",
-		})
-		if err != nil {
-			log.Fatalf("couldn't access remote log repo: %v", err)
-		}
+	remote, err := database.NewRepo(&database.Config{
+		Driver:     "pgx",
+		DataSource: getDSN(),
+		SchemaString: "db/migrations/postgres/000001_create_logs_table.up.sql",
+	})
+	if err != nil {
+		log.Fatalf("couldn't access remote log repo: %v", err)
 	}
 
-	
-	logService := service.NewLogService(nil, mainDB)
-
-	// init services & adapters
-	// cacheService := service.NewLogService(cache)
-	// cacheService := service.NewLogService(mainDBService)
-	// grpcAdapter := gRPC.NewAdapter(coreService)
+	repo := database.NewMultiRepo(cache, remote)
+	svc := service.NewLogService(repo)
+	grpcAdapter := gRPC.NewAdapter(svc)
 
 	// run server
-	listenPort := ":9090"
+	listenPort := getEnvOrDefault("LISTEN_PORT", ":9090")
 	lis, err := net.Listen("tcp", listenPort)
 	if err != nil {
 		log.Fatalf("failed to listen on port %s: %v", listenPort, err)
