@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS logs (
-  event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), 
+  event_id UUID PRIMARY KEY, 
   command TEXT NOT NULL,
   exit_code INT,
   ts TIMESTAMPTZ NOT NULL,          

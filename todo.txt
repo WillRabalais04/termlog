@@ -1,7 +1,21 @@
 core functionality:
+- fix postgres logging
+- frontend dashboard for both modes
 - add api
-    - implement actual querying beyond list 
-- clean up makefile
+    - implement actual querying beyond list
+    - add get logs list filters 
 - org mode
-features: 
+    - dockerize, kubernetes deployment
+    - kafka for high loads
+    - users & devices (keycloak maybe)
+hygiene: 
+- clean up makefile
+- unit tests
+- making logger binary smaller
+- clean up .env file flow
+possible new features: 
 - add pause/resume logging functionality
+- encrypt logs
+- log cmd outputs
+- grafana logging
+- autogen better postgres passwords

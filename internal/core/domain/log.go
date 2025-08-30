@@ -5,6 +5,7 @@ import (
 )
 
 type LogEntry struct {
+	EventID              string
 	Command              string
 	ExitCode             int32
 	Timestamp            int64
@@ -28,6 +29,7 @@ type LogEntry struct {
 
 func ReqToDomainLogEntry(req *log.LogEntry) LogEntry {
 	return LogEntry{
+		EventID:              req.EventId,
 		Command:              req.Command,
 		ExitCode:             req.ExitCode,
 		Timestamp:            req.Timestamp,

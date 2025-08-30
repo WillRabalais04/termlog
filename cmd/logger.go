@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/cmd/utils"
@@ -14,6 +13,7 @@ import (
 	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -69,10 +69,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to get home directory: %v", err)
 	}
+	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
+		log.Println("no .env found, using system env vars")
+	}
 
 	cachePath := utils.GetEnvOrDefault("LOG_DIR", filepath.Join(homeDir, ".termlogger", "cache.db"))
 
-	cacheRepo, err := database.NewRepo(&database.Config{
+	cache, err := database.NewRepo(&database.Config{
 		Driver:       "sqlite3",
 		DataSource:   cachePath,
 		SchemaString: db.SqliteSchema,
@@ -82,16 +85,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	isOrgMode, err := strconv.ParseBool(os.Getenv("ORG_MODE"))
-	if err != nil {
-		log.Printf("could not read 'ORG_MODE' env var: %v\ndefaulted to false", err)
-		isOrgMode = false
-	}
+	mode := os.Getenv("APP_MODE")
 
 	var svc *service.LogService
 
-	if isOrgMode {
-		remoteRepo, err := database.NewRepo(&database.Config{
+	if mode == "org" {
+		remote, err := database.NewRepo(&database.Config{
 			Driver:       "pgx",
 			DataSource:   utils.GetDSN(),
 			SchemaString: db.PostgresSchema,
@@ -99,10 +98,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("could not init remote repo (postgres): %v", err)
 		}
-		multiRepo := database.NewMultiRepo(cacheRepo, remoteRepo)
+		multiRepo := database.NewMultiRepo(cache, remote)
 		svc = service.NewLogService(multiRepo)
 	} else {
-		svc = service.NewLogService(cacheRepo)
+		svc = service.NewLogService(cache)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

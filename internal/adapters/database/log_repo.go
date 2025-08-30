@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
+	"github.com/google/uuid"
 
 	sq "github.com/Masterminds/squirrel"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -37,7 +38,7 @@ func InitDB(driver, dataSource string) (*sql.DB, error) {
 
 	switch driver {
 	case "pgx":
-		db.SetMaxOpenConns(25)
+		db.SetMaxOpenConns(25) // arbitrary should think about more later
 		db.SetMaxIdleConns(25)
 		db.SetConnMaxLifetime(5 * time.Minute)
 	case "sqlite3":
@@ -55,7 +56,7 @@ func NewRepo(cfg *Config) (*LogRepo, error) {
 		return nil, fmt.Errorf("failed to init db: %v", err)
 	}
 
-	if _, err := db.Exec(string(cfg.SchemaString)); err != nil {
+	if _, err := db.Exec(cfg.SchemaString); err != nil {
 		return nil, fmt.Errorf("failed to execute schema: %w", err)
 	}
 
@@ -71,14 +72,16 @@ func NewRepo(cfg *Config) (*LogRepo, error) {
 }
 
 func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
+	entry.EventID = uuid.New().String()
 	query := r.sb.Insert("logs").
 		Columns(
-			"command", "exit_code", "ts", "shell_pid", "shell_uptime", "cwd",
+			"event_id", "command", "exit_code", "ts", "shell_pid", "shell_uptime", "cwd",
 			"prev_cwd", "user_name", "euid", "term", "hostname", "ssh_client",
 			"tty", "git_repo", "git_repo_root", "git_branch", "git_commit",
 			"git_status", "logged_successfully",
 		).
 		Values(
+			entry.EventID,
 			entry.Command,
 			entry.ExitCode,
 			time.Unix(entry.Timestamp, 0),
@@ -114,4 +117,20 @@ func (r *LogRepo) Get(ctx context.Context, id int) (domain.LogEntry, error) {
 }
 func (r *LogRepo) List(ctx context.Context) ([]domain.LogEntry, error) {
 	return nil, nil
+}
+
+func (r *LogRepo) Delete(ctx context.Context, id string) error {
+	query := r.sb.Delete("logs").Where(sq.Eq{"event_id": id})
+
+	sqlStr, args, err := query.ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build delete query: %w", err)
+	}
+
+	_, err = r.db.ExecContext(ctx, sqlStr, args...)
+	if err != nil {
+		return fmt.Errorf("failed to execute delete query: %w", err)
+	}
+
+	return nil
 }

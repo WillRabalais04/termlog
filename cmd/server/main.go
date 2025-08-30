@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -13,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 
 	gen "github.com/WillRabalais04/terminalLog/api/gen"
-
+	"github.com/WillRabalais04/terminalLog/cmd/utils"
 	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
 	gRPC "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
@@ -21,22 +20,21 @@ import (
 )
 
 func main() {
-
-	if err := godotenv.Load(".env.org"); err != nil {
-		log.Println("no cmd/server/.env.org found, using system env vars")
+	if err := godotenv.Load(); err != nil {
+		log.Println("no .env found")
 	}
 
 	cache, err := database.NewRepo(&database.Config{
-		Driver:     "sqlite3",
-		DataSource: "./data.db",
+		Driver:       "sqlite3",
+		DataSource:   "./data.db",
 		SchemaString: "db/migrations/sqlite/000001_create_logs_table.up.sql",
 	})
 	if err != nil {
 		log.Fatalf("couldn't access log cache: %v", err)
 	}
 	remote, err := database.NewRepo(&database.Config{
-		Driver:     "pgx",
-		DataSource: getDSN(),
+		Driver:       "pgx",
+		DataSource:   utils.GetDSN(),
 		SchemaString: "db/migrations/postgres/000001_create_logs_table.up.sql",
 	})
 	if err != nil {
@@ -70,20 +68,6 @@ func main() {
 
 	log.Println("Shutting down gRPC server...")
 	gRPCServer.GracefulStop()
-}
-
-func getDSN() string {
-	host := getEnvOrDefault("DB_HOST", "localhost")
-	port := getEnvOrDefault("DB_PORT", "5432")
-	user := getEnvOrDefault("DB_USER", "postgres")
-	password := getEnvOrDefault("DB_PASSWORD", "")
-	dbname := getEnvOrDefault("DB_NAME", "terminallog")
-	sslmode := getEnvOrDefault("DB_SSLMODE", "disable")
-
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, dbname, sslmode)
-
-	return dsn
 }
 
 func getEnvOrDefault(key, defaultVal string) string {

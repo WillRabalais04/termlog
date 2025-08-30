@@ -23,25 +23,26 @@ const (
 
 type LogEntry struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	Command              string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
-	ExitCode             int32                  `protobuf:"varint,2,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	Timestamp            int64                  `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	Shell_PID            int32                  `protobuf:"varint,4,opt,name=shell_PID,json=shellPID,proto3" json:"shell_PID,omitempty"`
-	ShellUptime          int64                  `protobuf:"varint,5,opt,name=shell_uptime,json=shellUptime,proto3" json:"shell_uptime,omitempty"`
-	WorkingDirectory     string                 `protobuf:"bytes,6,opt,name=working_directory,json=workingDirectory,proto3" json:"working_directory,omitempty"`
-	PrevWorkingDirectory string                 `protobuf:"bytes,7,opt,name=prev_working_directory,json=prevWorkingDirectory,proto3" json:"prev_working_directory,omitempty"`
-	User                 string                 `protobuf:"bytes,8,opt,name=user,proto3" json:"user,omitempty"`
-	EUID                 int32                  `protobuf:"varint,9,opt,name=EUID,proto3" json:"EUID,omitempty"`
-	Term                 string                 `protobuf:"bytes,10,opt,name=term,proto3" json:"term,omitempty"`
-	Hostname             string                 `protobuf:"bytes,11,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	SSHClient            string                 `protobuf:"bytes,12,opt,name=SSH_client,json=SSHClient,proto3" json:"SSH_client,omitempty"`
-	TTY                  string                 `protobuf:"bytes,13,opt,name=TTY,proto3" json:"TTY,omitempty"`
-	IsGitRepo            bool                   `protobuf:"varint,14,opt,name=is_git_repo,json=isGitRepo,proto3" json:"is_git_repo,omitempty"`
-	GitRepoRoot          string                 `protobuf:"bytes,15,opt,name=git_repo_root,json=gitRepoRoot,proto3" json:"git_repo_root,omitempty"`
-	GitBranch            string                 `protobuf:"bytes,16,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
-	GitCommit            string                 `protobuf:"bytes,17,opt,name=git_commit,json=gitCommit,proto3" json:"git_commit,omitempty"`
-	GitStatus            string                 `protobuf:"bytes,18,opt,name=git_status,json=gitStatus,proto3" json:"git_status,omitempty"`
-	LoggedSuccessfully   bool                   `protobuf:"varint,19,opt,name=logged_successfully,json=loggedSuccessfully,proto3" json:"logged_successfully,omitempty"`
+	EventId              string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Command              string                 `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	ExitCode             int32                  `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	Timestamp            int64                  `protobuf:"varint,4,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Shell_PID            int32                  `protobuf:"varint,5,opt,name=shell_PID,json=shellPID,proto3" json:"shell_PID,omitempty"`
+	ShellUptime          int64                  `protobuf:"varint,6,opt,name=shell_uptime,json=shellUptime,proto3" json:"shell_uptime,omitempty"`
+	WorkingDirectory     string                 `protobuf:"bytes,7,opt,name=working_directory,json=workingDirectory,proto3" json:"working_directory,omitempty"`
+	PrevWorkingDirectory string                 `protobuf:"bytes,8,opt,name=prev_working_directory,json=prevWorkingDirectory,proto3" json:"prev_working_directory,omitempty"`
+	User                 string                 `protobuf:"bytes,9,opt,name=user,proto3" json:"user,omitempty"`
+	EUID                 int32                  `protobuf:"varint,10,opt,name=EUID,proto3" json:"EUID,omitempty"`
+	Term                 string                 `protobuf:"bytes,11,opt,name=term,proto3" json:"term,omitempty"`
+	Hostname             string                 `protobuf:"bytes,12,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	SSHClient            string                 `protobuf:"bytes,13,opt,name=SSH_client,json=SSHClient,proto3" json:"SSH_client,omitempty"`
+	TTY                  string                 `protobuf:"bytes,14,opt,name=TTY,proto3" json:"TTY,omitempty"`
+	IsGitRepo            bool                   `protobuf:"varint,15,opt,name=is_git_repo,json=isGitRepo,proto3" json:"is_git_repo,omitempty"`
+	GitRepoRoot          string                 `protobuf:"bytes,16,opt,name=git_repo_root,json=gitRepoRoot,proto3" json:"git_repo_root,omitempty"`
+	GitBranch            string                 `protobuf:"bytes,17,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
+	GitCommit            string                 `protobuf:"bytes,18,opt,name=git_commit,json=gitCommit,proto3" json:"git_commit,omitempty"`
+	GitStatus            string                 `protobuf:"bytes,19,opt,name=git_status,json=gitStatus,proto3" json:"git_status,omitempty"`
+	LoggedSuccessfully   bool                   `protobuf:"varint,20,opt,name=logged_successfully,json=loggedSuccessfully,proto3" json:"logged_successfully,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -74,6 +75,13 @@ func (x *LogEntry) ProtoReflect() protoreflect.Message {
 // Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
 func (*LogEntry) Descriptor() ([]byte, []int) {
 	return file_log_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *LogEntry) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
 }
 
 func (x *LogEntry) GetCommand() string {
@@ -257,32 +265,33 @@ var File_log_proto protoreflect.FileDescriptor
 
 const file_log_proto_rawDesc = "" +
 	"\n" +
-	"\tlog.proto\x12\x03log\"\xdd\x04\n" +
-	"\bLogEntry\x12\x18\n" +
-	"\acommand\x18\x01 \x01(\tR\acommand\x12\x1b\n" +
-	"\texit_code\x18\x02 \x01(\x05R\bexitCode\x12\x1c\n" +
-	"\ttimestamp\x18\x03 \x01(\x03R\ttimestamp\x12\x1b\n" +
-	"\tshell_PID\x18\x04 \x01(\x05R\bshellPID\x12!\n" +
-	"\fshell_uptime\x18\x05 \x01(\x03R\vshellUptime\x12+\n" +
-	"\x11working_directory\x18\x06 \x01(\tR\x10workingDirectory\x124\n" +
-	"\x16prev_working_directory\x18\a \x01(\tR\x14prevWorkingDirectory\x12\x12\n" +
-	"\x04user\x18\b \x01(\tR\x04user\x12\x12\n" +
-	"\x04EUID\x18\t \x01(\x05R\x04EUID\x12\x12\n" +
-	"\x04term\x18\n" +
-	" \x01(\tR\x04term\x12\x1a\n" +
-	"\bhostname\x18\v \x01(\tR\bhostname\x12\x1d\n" +
+	"\tlog.proto\x12\x03log\"\xf8\x04\n" +
+	"\bLogEntry\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x18\n" +
+	"\acommand\x18\x02 \x01(\tR\acommand\x12\x1b\n" +
+	"\texit_code\x18\x03 \x01(\x05R\bexitCode\x12\x1c\n" +
+	"\ttimestamp\x18\x04 \x01(\x03R\ttimestamp\x12\x1b\n" +
+	"\tshell_PID\x18\x05 \x01(\x05R\bshellPID\x12!\n" +
+	"\fshell_uptime\x18\x06 \x01(\x03R\vshellUptime\x12+\n" +
+	"\x11working_directory\x18\a \x01(\tR\x10workingDirectory\x124\n" +
+	"\x16prev_working_directory\x18\b \x01(\tR\x14prevWorkingDirectory\x12\x12\n" +
+	"\x04user\x18\t \x01(\tR\x04user\x12\x12\n" +
+	"\x04EUID\x18\n" +
+	" \x01(\x05R\x04EUID\x12\x12\n" +
+	"\x04term\x18\v \x01(\tR\x04term\x12\x1a\n" +
+	"\bhostname\x18\f \x01(\tR\bhostname\x12\x1d\n" +
 	"\n" +
-	"SSH_client\x18\f \x01(\tR\tSSHClient\x12\x10\n" +
-	"\x03TTY\x18\r \x01(\tR\x03TTY\x12\x1e\n" +
-	"\vis_git_repo\x18\x0e \x01(\bR\tisGitRepo\x12\"\n" +
-	"\rgit_repo_root\x18\x0f \x01(\tR\vgitRepoRoot\x12\x1d\n" +
+	"SSH_client\x18\r \x01(\tR\tSSHClient\x12\x10\n" +
+	"\x03TTY\x18\x0e \x01(\tR\x03TTY\x12\x1e\n" +
+	"\vis_git_repo\x18\x0f \x01(\bR\tisGitRepo\x12\"\n" +
+	"\rgit_repo_root\x18\x10 \x01(\tR\vgitRepoRoot\x12\x1d\n" +
 	"\n" +
-	"git_branch\x18\x10 \x01(\tR\tgitBranch\x12\x1d\n" +
+	"git_branch\x18\x11 \x01(\tR\tgitBranch\x12\x1d\n" +
 	"\n" +
-	"git_commit\x18\x11 \x01(\tR\tgitCommit\x12\x1d\n" +
+	"git_commit\x18\x12 \x01(\tR\tgitCommit\x12\x1d\n" +
 	"\n" +
-	"git_status\x18\x12 \x01(\tR\tgitStatus\x12/\n" +
-	"\x13logged_successfully\x18\x13 \x01(\bR\x12loggedSuccessfully\"'\n" +
+	"git_status\x18\x13 \x01(\tR\tgitStatus\x12/\n" +
+	"\x13logged_successfully\x18\x14 \x01(\bR\x12loggedSuccessfully\"'\n" +
 	"\vLogResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess24\n" +
 	"\n" +

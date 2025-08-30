@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 )
@@ -13,16 +14,40 @@ type MultiRepo struct {
 }
 
 func NewMultiRepo(cache, remote *LogRepo) *MultiRepo {
-	return &MultiRepo{remote: remote, cache: cache}
+	return &MultiRepo{cache: cache, remote: remote}
 }
 
 func (r *MultiRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
-	if errRemote := r.remote.Log(ctx, entry); errRemote != nil {
-		errCache := r.cache.Log(ctx, entry)
-		if errCache != nil {
-			return fmt.Errorf("logging failed at remote (%v) AND in cache (%v)", errRemote, errCache)
+	if err := r.flushCache(ctx); err != nil {
+		log.Printf("warning: failed to flush cache: %v\n", err)
+	}
+
+	if err := r.remote.Log(ctx, entry); err != nil {
+		if errCache := r.cache.Log(ctx, entry); errCache != nil {
+			return fmt.Errorf("failed remote (%v) and cache (%v)", err, errCache)
 		}
-		return fmt.Errorf("cached log due to remote repo failure: %w", errRemote)
+		return fmt.Errorf("remote failed, cached entry: %w", err)
+	}
+
+	return nil
+}
+
+func (r *MultiRepo) flushCache(ctx context.Context) error {
+	entries, err := r.cache.List(ctx)
+	if err != nil {
+		return fmt.Errorf("reading cache failed: %w", err)
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+
+	for _, e := range entries {
+		if err := r.remote.Log(ctx, &e); err != nil {
+			return fmt.Errorf("failed to push cached entry %s: %w", e.EventID, err)
+		}
+		if err := r.cache.Delete(ctx, e.EventID); err != nil {
+			return fmt.Errorf("failed to delete cached entry %s: %w", e.EventID, err)
+		}
 	}
 	return nil
 }
@@ -41,4 +66,12 @@ func (r *MultiRepo) List(ctx context.Context) ([]domain.LogEntry, error) {
 		return r.cache.List(ctx)
 	}
 	return entries, nil
+}
+
+func (r *MultiRepo) Delete(ctx context.Context, id string) error {
+	err := r.remote.Delete(ctx, id)
+	if err != nil {
+		return r.cache.Delete(ctx, id)
+	}
+	return nil
 }

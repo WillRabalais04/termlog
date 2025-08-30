@@ -12,12 +12,9 @@ services:
   migrate:
     image: migrate/migrate
     volumes:
-      - ./db/migrations:/migrations
-    command: [
-      "-path", "/migrations",
-      "-database", "postgres://postgres:password@db:5432/logs?sslmode=disable",
-      "up"
-    ]
+      - ./db/migrations/postgres:/migrations
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://postgres:password@db:5432/logs?sslmode=disable"]
+    command: ["up"]
     depends_on:
       - db
   # kafka: # will implement multi user mode with kafka later

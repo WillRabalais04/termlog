@@ -1,7 +1,9 @@
+ENV_FILE=./.env
 SOURCE_FILE=./cmd/logger.go
 BIN_DIR=./cmd/bin/
 INSTALL_PATH=/usr/local/bin/termlogger
 CONFIG_DIR=$(HOME)/.termlogger
+BIN_ENV_FILE=$(CONFIG_DIR)/.env
 CACHE_PATH=$(CONFIG_DIR)/cache.db
 TEST_CACHE=./testing/logs
 BASH_RC=$(HOME)/.bashrc
@@ -10,10 +12,22 @@ PROJECT_ROOT=$(shell pwd)
 TERMLOGGER_HOOK_SCRIPT=./hooks/termlogger_hook.sh
 REMOVE_HOOK_SCRIPT=./hooks/remove_hook.sh
 
-.PHONY: all clean cleanml cleantl configdir help logbin proto protoclean removebin removeconfigdir removehook setbin sethook setup testlogdir uninstall
+.PHONY: all clean clean-cache clean-remote clean-test clean-proto config-dir env-setup help log-bin proto clean-proto remove-bin set-config remove-config remove-hook set-bin set-hook setup test-logdir uninstall
 all: help
 
-logbin:
+env-setup:
+	@if [ ! -f "$(ENV_FILE)" ]; then \
+		echo "📋 No .env file found. Copying from .env.example..."; \
+		cp .env.example $(ENV_FILE); \
+		echo "✅ .env file created. Please configure it with your credentials."; \
+	fi
+
+set-config: env-setup
+	@echo "🔧 Installing user config to '$(BIN_ENV_FILE)'..."
+	@cp $(ENV_FILE) $(BIN_ENV_FILE)
+	@echo "✅ User config installed/updated."
+	
+log-bin:
 	@echo "📦 Compiling logger..."
 	@if ! go build -o $(BIN_DIR) $(SOURCE_FILE); then \
 		echo "❌ Compilation failed."; \
@@ -21,24 +35,24 @@ logbin:
 	fi
 	@echo "✅ Compilation successful."
 
-setbin: logbin
+set-bin: log-bin
 	@echo "🚀 Installing binary in '$(INSTALL_PATH)'..."
 	@sudo mkdir -p "$(shell dirname $(INSTALL_PATH))"
 	@sudo cp "$(BIN_DIR)/logger" "$(INSTALL_PATH)"
-	@echo "✅ Binary installed successfully."
+	@echo "✅ Binary installed/updated."
 
-configdir:
+config-dir:
 	@echo "🔧 Creating config directory at '$(CONFIG_DIR)'..."
 	@mkdir -p "$(CONFIG_DIR)"
 	@echo "✅ Config directory successfully created."
 	@echo "$(PROJECT_ROOT)" > "$(CONFIG_DIR)/project_root"
 	
-testlogdir:
+test-logdir:
 	@echo "🔧 Creating testing log directory at '$(TEST_CACHE)'..."
 	@mkdir -p "$(TEST_CACHE)"
 	@echo "✅ Test log directory successfully created."
 
-sethook:
+set-hook:
 	@if [ -f "$(ZSH_RC)" ]; then \
 		RC_FILE="$(ZSH_RC)"; \
 	elif [ -f "$(BASH_RC)" ]; then \
@@ -58,13 +72,15 @@ sethook:
 
 setup:
 	@echo "🚀  Starting setup..."
+	@$(MAKE) proto
+	@$(MAKE) config-dir
+	@$(MAKE) set-config
+	@$(MAKE) migrate-up > /dev/null 2>&1
+	@$(MAKE) set-bin
+	@$(MAKE) test-logdir
+	@$(MAKE) set-hook
 
-	@$(MAKE) configdir
-	@$(MAKE) setbin
-	@$(MAKE) testlogdir
-	@$(MAKE) sethook
-
-removebin:
+remove-bin:
 	@if [ -f "$(INSTALL_PATH)" ]; then \
 		echo "🔐 Sudo required at $(INSTALL_PATH)."; \
 		if sudo rm -f "$(INSTALL_PATH)"; then \
@@ -78,7 +94,7 @@ removebin:
 		echo "✅ Nothing to remove!"; \
 	fi
 
-removehook:
+remove-hook:
 	@RC_FILE=""; \
 	if [ -f "$(ZSH_RC)" ]; then \
 		RC_FILE="$(ZSH_RC)"; \
@@ -101,7 +117,7 @@ removehook:
 		echo "❌ RC file not found. Cannot remove hook."; \
 	fi
 
-removeconfigdir:
+remove-config:
 	@if [ -d "$(CONFIG_DIR)" ]; then \
 		echo "⛔️ Found configuration and log directory at '$(CONFIG_DIR)'."; \
 		read -p "❓ Do you want to permanently delete this directory? [y/n] "  -n 1 -r; \
@@ -119,25 +135,26 @@ removeconfigdir:
 
 uninstall:
 	@echo "🗑️  Starting uninstallation..."
-	@$(MAKE) removebin
-	@$(MAKE) removehook
-	@$(MAKE) removeconfigdir
-	@$(MAKE) cleantl
+	@$(MAKE) remove-bin
+	@$(MAKE) remove-hook
+	@$(MAKE) remove-config
+	@$(MAKE) clean
 	@echo "🎉 Uninstallation complete."
 	
 clean:
 	@echo "🧼 Cleaning logs.."
-	@$(MAKE) cleanml
-	@$(MAKE) cleantl
-	@$(MAKE) protoclean
+	@$(MAKE) clean-cache
+	@$(MAKE) clean-remote
+	@$(MAKE) clean-test
+	@$(MAKE) clean-proto
 
-cleanml:
+clean-cache:
 	@if [ -d "$(CACHE_PATH)" ]; then \
 		read -p "❓ Do you want to delete all of the main logs? [y/n] " -n 1 -r; \
 		echo ""; \
 		if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
 			echo "🗑️  Deleting contents of '$(CACHE_PATH)'..."; \
-			@rm -r $(CACHE_PATH)
+			@rm -r $(CACHE_PATH) \
 			echo "✅ Deletion complete."; \
 		else \
 			echo "⏩ Skipping deletion."; \
@@ -147,7 +164,12 @@ cleanml:
 		echo "✅ Nothing to remove!"; \
 	fi
 
-cleantl:
+clean-remote:
+	@echo "🗑️ Deleting contents of postgres DB";
+	@$(MAKE) migrate-down > /dev/null 2>&1;
+	@echo "✅ Deletion complete.";
+
+clean-test:
 	@if [ -d "$(TEST_CACHE)" ]; then \
 		read -p "❓ Do you want to delete all of the testing logs? [y/n] " -n 1 -r; \
 		echo ""; \
@@ -161,13 +183,12 @@ cleantl:
 	else \
 		echo "🤔 Test log directory '$(TEST_CACHE)' not found."; \
 		echo "✅ Nothing to remove!"; \
-	fi
+	fi;
 
+clean-proto:
+	@rm -rf api/gen/*
 proto: 
 	@buf generate
-
-protoclean:
-	@rm -rf api/gen/*
 
 migrate-up:
 	docker-compose run --rm migrate
@@ -180,19 +201,19 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all             Shows this help message."
-	@echo "  logbin          Compiles the logger Go source file."
-	@echo "  setbin          Places the compiled binary into the user's binary folder."
-	@echo "  configdir       Creates the configuration directory."
-	@echo "  testlogdir      Creates the testing log directory."
-	@echo "  sethook         Installs the shell hook for termlogger."
+	@echo "  log-bin          Compiles the logger Go source file."
+	@echo "  set-bin          Places the compiled binary into the user's binary folder."
+	@echo "  config-dir       Creates the configuration directory."
+	@echo "  test-log-dir      Creates the testing log directory."
+	@echo "  set-hook         Installs the shell hook for termlogger."
 	@echo "  setup           Builds and installs the termlogger binary and shell hook."
 	@echo "  uninstall       Removes the termlogger binary, shell hook, and optionally the config directory."
-	@echo "  removebin       Removes the installed binary."
-	@echo "  removehook      Removes the shell hook."
-	@echo "  removeconfigdir Removes the configuration directory."
+	@echo "  remove-bin       Removes the installed binary."
+	@echo "  remove-hook      Removes the shell hook."
+	@echo "  remove-config Removes the configuration directory."
 	@echo "  clean           Deletes main and testing log files."
-	@echo "  cleanml         Deletes main log files."
-	@echo "  cleantl         Deletes testing log files."
+	@echo "  clean-cache         Deletes main log files."
+	@echo "  clean-test         Deletes testing log files."
 	@echo "  proto           Builds proto files."
-	@echo "  protoclean      Removes proto files."
+	@echo "  clean-proto      Removes proto files."
 	@echo "  help            Shows this help message."

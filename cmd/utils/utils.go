@@ -16,7 +16,7 @@ func GetDSN() string {
 	host := GetEnvOrDefault("DB_HOST", "localhost")
 	port := GetEnvOrDefault("DB_PORT", "5432")
 	user := GetEnvOrDefault("DB_USER", "postgres")
-	password := GetEnvOrDefault("DB_PASSWORD", "")
+	password := GetEnvOrDefault("DB_PASSWORD", "password")
 	dbname := GetEnvOrDefault("DB_NAME", "terminallog")
 	sslmode := GetEnvOrDefault("DB_SSLMODE", "disable")
 
