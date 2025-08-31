@@ -319,20 +319,20 @@ func scanLogEntry(scanner interface {
 	return &entry, nil
 }
 
-func validateOrdering(ordering *string) (string, bool) {
-	var desc bool
+func validateOrdering(ordering *string) (string, string) {
+	orderDir := "DESC"
 	validatedOrdering := defaultOrdering
 
 	if ordering != nil {
 		derefedOrdering := strings.ToLower(*ordering)
 		if derefedOrdering[0] == '-' {
 			derefedOrdering = derefedOrdering[1:]
-			desc = true
+			orderDir = "ASC"
 		}
 		if _, ok := allowedOrderings[derefedOrdering]; ok {
 			validatedOrdering = derefedOrdering
 		}
 	}
 
-	return validatedOrdering, desc
+	return validatedOrdering, orderDir
 }
