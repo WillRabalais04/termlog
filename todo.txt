@@ -1,5 +1,5 @@
 core functionality:
-- fix postgres logging
+- standardize col names
 - frontend dashboard for both modes
 - add api
     - implement actual querying beyond list
@@ -14,6 +14,7 @@ hygiene:
 - making logger binary smaller
 - clean up .env file flow
 possible new features: 
+- track currently running terminals? maybe currently running processes even? 
 - add pause/resume logging functionality
 - encrypt logs
 - log cmd outputs

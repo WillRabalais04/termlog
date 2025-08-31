@@ -63,7 +63,7 @@ set-hook:
 	fi; \
 	cp "$$RC_FILE" "$$RC_FILE.backup.$(shell date +%s)"; \
 	TMP_FILE=$$(mktemp); \
-	sed '/### >>> termlogger start >>>/,/### <<< termlogger end <<</d' "$$RC_FILE" > "$$TMP_FILE"; \
+	sed '/### >>> logger start >>>/,/### <<< logger end <<</d' "$$RC_FILE" > "$$TMP_FILE"; \
 	mv "$$TMP_FILE" "$$RC_FILE"; \
 	echo "🪝 Installing/updating hook in '$$RC_FILE'..."; \
 	cat $(TERMLOGGER_HOOK_SCRIPT) >> "$$RC_FILE"; \
@@ -109,7 +109,7 @@ remove-hook:
 		else \
 			echo "🪝 Removing hook manually from $$RC_FILE..."; \
 			TMP_FILE=$$(mktemp); \
-			sed '/### >>> termlogger start >>>/,/### <<< termlogger end <<</d' "$$RC_FILE" > "$$TMP_FILE"; \
+			sed '/### >>> logger start >>>/,/### <<< logger end <<</d' "$$RC_FILE" > "$$TMP_FILE"; \
 			mv "$$TMP_FILE" "$$RC_FILE"; \
 			echo "✅ Hook removed successfully."; \
 		fi; \

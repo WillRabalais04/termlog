@@ -8,6 +8,8 @@ import (
 
 type APIPort interface {
 	Log(ctx context.Context, entry *domain.LogEntry) error
-	Get(ctx context.Context, id int) (domain.LogEntry, error)
-	List(ctx context.Context) ([]domain.LogEntry, error)
+	Get(ctx context.Context, id int) (*domain.LogEntry, error)
+	List(ctx context.Context, filters *LogQuery) ([]*domain.LogEntry, error)
+	Delete(ctx context.Context, id string) error
+	DeleteMultiple(ctx context.Context, filters *LogQuery) error
 }

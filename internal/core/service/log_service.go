@@ -19,9 +19,17 @@ func NewLogService(repo ports.LogRepositoryPort) *LogService {
 func (s *LogService) Log(ctx context.Context, entry *domain.LogEntry) error {
 	return s.repo.Log(ctx, entry)
 }
-func (s *LogService) Get(ctx context.Context, id int) (domain.LogEntry, error) {
+func (s *LogService) Get(ctx context.Context, id int) (*domain.LogEntry, error) {
 	return s.repo.Get(ctx, id)
 }
-func (s *LogService) List(ctx context.Context) ([]domain.LogEntry, error) {
-	return s.repo.List(ctx)
+func (s *LogService) List(ctx context.Context, filters *ports.LogQuery) ([]*domain.LogEntry, error) {
+	return s.repo.List(ctx, filters)
+}
+
+func (s *LogService) Delete(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+
+}
+func (s *LogService) DeleteMultiple(ctx context.Context, filters *ports.LogQuery) error {
+	return s.repo.DeleteMultiple(ctx, filters)
 }
