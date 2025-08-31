@@ -1,18 +1,24 @@
-ENV_FILE=./.env
-SOURCE_FILE=./cmd/logger.go
-BIN_DIR=./cmd/bin/
-INSTALL_PATH=/usr/local/bin/termlogger
-CONFIG_DIR=$(HOME)/.termlogger
+# files
+ENV_FILE=.env
 BIN_ENV_FILE=$(CONFIG_DIR)/.env
-CACHE_PATH=$(CONFIG_DIR)/cache.db
-TEST_CACHE=./testing/logs
+SOURCE_FILE=./cmd/logger.go
+
 BASH_RC=$(HOME)/.bashrc
 ZSH_RC=$(HOME)/.zshrc
+
+# directories
+BIN_DIR=./cmd/bin/
+CONFIG_DIR=$(HOME)/.termlogger
+CACHE_PATH=$(CONFIG_DIR)/cache.db
+INSTALL_PATH=/usr/local/bin/termlogger
 PROJECT_ROOT=$(shell pwd)
+TEST_CACHE=./testing
+
+# hooks
 TERMLOGGER_HOOK_SCRIPT=./hooks/termlogger_hook.sh
 REMOVE_HOOK_SCRIPT=./hooks/remove_hook.sh
 
-.PHONY: all clean clean-cache clean-remote clean-test clean-proto config-dir env-setup help log-bin proto clean-proto remove-bin set-config remove-config remove-hook set-bin set-hook setup test-logdir uninstall
+.PHONY: all clean clean-cache clean-remote clean-test clean-proto config-dir env-setup log-bin proto remove-bin set-config remove-config remove-hook set-bin set-hook setup test-logdir uninstall help
 all: help
 
 env-setup:
@@ -187,6 +193,7 @@ clean-test:
 
 clean-proto:
 	@rm -rf api/gen/*
+
 proto: 
 	@buf generate
 
@@ -201,6 +208,7 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all             Shows this help message."
+	@echo " env-setup        Creates .env file from template if it doesn't already exist."
 	@echo "  log-bin          Compiles the logger Go source file."
 	@echo "  set-bin          Places the compiled binary into the user's binary folder."
 	@echo "  config-dir       Creates the configuration directory."

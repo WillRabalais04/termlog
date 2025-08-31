@@ -35,12 +35,7 @@ func GetEnvOrDefault(key, defaultVal string) string {
 
 func LogJSON(newEntry *pb.LogEntry, projectDir string) {
 
-	testLogsDir := filepath.Join(projectDir, "testing", "logs")
-	testLogFile := filepath.Join(testLogsDir, "logs.json")
-
-	if err := os.MkdirAll(testLogsDir, 0755); err != nil {
-		log.Fatalf("failed to create log directory: %v", err)
-	}
+	testLogFile := filepath.Join(projectDir, "testing", "logs.json")
 
 	err := WriteToJSON(newEntry, testLogFile)
 	if err != nil {

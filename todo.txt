@@ -1,5 +1,6 @@
 core functionality:
 - standardize col names
+- maybe add org mode
 - frontend dashboard for both modes
 - add api
     - implement actual querying beyond list
@@ -9,10 +10,13 @@ core functionality:
     - kafka for high loads
     - users & devices (keycloak maybe)
 hygiene: 
+- track error handling better it gets silenced somewhere
 - clean up makefile
 - unit tests
+- setup test docker image for test postgres db
 - making logger binary smaller
 - clean up .env file flow
+- testing make targets
 possible new features: 
 - track currently running terminals? maybe currently running processes even? 
 - add pause/resume logging functionality
@@ -20,3 +24,5 @@ possible new features:
 - log cmd outputs
 - grafana logging
 - autogen better postgres passwords
+- add performant mode that doesn't call git status every time or maybe no git mode or just let users opt into what they want to log every time
+- create a cache.db of testing logs or add random inputs for logging

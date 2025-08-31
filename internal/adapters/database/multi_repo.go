@@ -34,8 +34,8 @@ func (r *MultiRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 }
 
 func (r *MultiRepo) flushCache(ctx context.Context) error {
-	// think about filters to pass in here
-	entries, err := r.cache.List(ctx, nil)
+	entries, err := r.cache.List(ctx, &ports.LogQuery{}) // empty filter should return all
+
 	if err != nil {
 		return fmt.Errorf("reading cache failed: %w", err)
 	}
