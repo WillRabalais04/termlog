@@ -1,3 +1,3 @@
 .DS_Store
-./testing/*
+./cmd/test/logs/*
 .env

@@ -40,52 +40,21 @@ func testLog(ctx context.Context, svc service.LogService) {
 		LoggedSuccessfully:   true,
 	}
 	err := svc.Log(ctx, entry)
-
-	prettyPrint("log", nil, err)
+	prettyPrint("log", []*domain.LogEntry{entry}, err)
 }
 
 func testGet(ctx context.Context, svc service.LogService) {
-	entry, err := svc.Get(ctx, 0)
-
+	entry, err := svc.Get(ctx, "a68037cc-7293-4a03-a264-edc5ff05ba58")
 	prettyPrint("get", []*domain.LogEntry{entry}, err)
 }
 
 func testList(ctx context.Context, svc service.LogService) {
-	eventID := "a"
-	command := "docker ps -a"
-	entries, err := svc.List(ctx, &ports.LogQuery{
-		EventID: &eventID,
-		Command: &command,
-		// User                 *string
-		// ExitCode             *int
-		// Limit                uint64
-		// Offset               uint64
-		// OrderBy              *string
-		// GitRepo              *bool
-		// Timestamp            *string
-		// ShellPID             *uint64
-		// ShellUptime          *uint64
-		// WorkingDirectory     *string
-		// PrevWorkingDirectory *string
-		// EUID                 *uint64 // make uint32?
-		// Term                 *string
-		// Hostname             *string
-		// SSHClient            *string
-		// TTY                  *string
-		// GitRepoRoot          *string
-		// Branch               *string
-		// Commit               *string
-		// LoggedSuccesfully    *bool
-	})
-
-	if err != nil {
-		log.Printf("testGet failed: %v", err)
-	}
-	fmt.Println(entries)
+	entries, err := svc.List(ctx, &ports.LogQuery{})
+	prettyPrint("list", entries, err)
 }
 
 func testDelete(ctx context.Context, svc service.LogService) {
-	err := svc.Delete(ctx, "aa")
+	err := svc.Delete(ctx, "a68037cc-7293-4a03-a264-edc5ff05ba58")
 	prettyPrint("delete", nil, err)
 }
 
@@ -102,30 +71,33 @@ func testDeleteMultiple(ctx context.Context, svc service.LogService) {
 }
 
 func prettyPrint(testName string, entries []*domain.LogEntry, err error) {
-	log.Printf("---------------Test: %s---------------\n", testName)
-	for _, e := range entries {
-		domain.PrintLogEntry(e) // doesn't work
+	fmt.Printf("---------------Test: %s---------------\n", testName)
+	if err != nil {
+		fmt.Printf("%v\n", err)
+	} else {
+		for _, e := range entries {
+			domain.PrintLogEntry(e)
+		}
 	}
 	spacing := make([]byte, len(testName))
 	for range len(testName) + 6 {
 		spacing = append(spacing, '-')
 	}
-	log.Printf("---------------%s---------------\n", spacing)
-
+	fmt.Printf("---------------%s---------------\n", spacing)
 }
 
-func main() {
+func loadEnv() {
 	homeDir, err := os.UserHomeDir()
-
 	if err != nil {
 		log.Fatalf("failed to get home directory: %v", err)
 	}
 	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
 		log.Println("no .env found, using system env vars")
 	}
-	var testSVC *service.LogService
-
-	cachePath := filepath.Join(utils.GetProjectRoot(homeDir), "testing", "cache.db")
+}
+func getLocalRepo() *database.LogRepo {
+	homeDir, err := os.UserHomeDir()
+	cachePath := filepath.Join(utils.GetProjectRoot(homeDir), "cmd", "test", "logs", "cache.db")
 	cache, err := database.NewRepo(&database.Config{
 		Driver:       "sqlite3",
 		DataSource:   cachePath,
@@ -135,28 +107,35 @@ func main() {
 		log.Printf("could not init cache repo (sqlite): %v", err)
 		os.Exit(1)
 	}
+	return cache
+}
 
-	// remote, err := database.NewRepo(&database.Config{
-	// 	Driver:       "pgx",
-	// 	DataSource:   utils.GetDSN(),
-	// 	SchemaString: db.PostgresSchema,
-	// })
-	// if err != nil {
-	// 	log.Fatalf("could not init remote repo (postgres): %v", err)
-	// }
-	// multiRepo := database.NewMultiRepo(cache, remote)
+func getRemoteRepo() *database.LogRepo {
+	remote, err := database.NewRepo(&database.Config{
+		Driver:       "pgx",
+		DataSource:   utils.GetTestDSN(),
+		SchemaString: db.PostgresSchema,
+	})
+	if err != nil {
+		log.Fatalf("could not init remote repo (postgres): %v", err)
+	}
+	return remote
+}
+func getMultiRepo() *database.MultiRepo {
+	multiRepo := database.NewMultiRepo(getLocalRepo(), getRemoteRepo())
+	return multiRepo
+}
 
-	// testSVC = service.NewLogService(multiRepo)
-	testSVC = service.NewLogService(cache)
-	// testSVC = service.NewLogService(remote)
+func main() {
+	loadEnv()
+	testSVC := service.NewLogService(getRemoteRepo())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	testLog(ctx, *testSVC)
-	testList(ctx, *testSVC)
-	testGet(ctx, *testSVC)
-	testDelete(ctx, *testSVC)
+	// testLog(ctx, *testSVC)
+	// testList(ctx, *testSVC)
+	// testGet(ctx, *testSVC)
+	// testDelete(ctx, *testSVC)
 	testDeleteMultiple(ctx, *testSVC)
-
 }

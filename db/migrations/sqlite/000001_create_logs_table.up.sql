@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS logs (
   event_id TEXT PRIMARY KEY,
   command TEXT NOT NULL,
   exit_code INTEGER,
-  ts TEXT NOT NULL,          
+  ts INTEGER,          
   shell_pid INTEGER,
   shell_uptime INTEGER, 
   cwd TEXT,     

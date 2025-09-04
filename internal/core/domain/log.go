@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"log"
+	"fmt"
 
 	pb "github.com/WillRabalais04/terminalLog/api/gen"
 )
@@ -29,29 +29,29 @@ type LogEntry struct {
 	LoggedSuccessfully   bool
 }
 
-func PrintLogEntry(entry *LogEntry) { // handle nil cases
+func PrintLogEntry(entry *LogEntry) {
 
-	log.Printf("LogEntry: {\n")
-	log.Printf("EventID:		%s\n", entry.EventID)
-	log.Printf("Command:		%s\n", entry.Command)
-	log.Printf("ExitCode:		%d\n", entry.ExitCode)
-	log.Printf("Timestamp:		%d\n", entry.Timestamp)
-	log.Printf("Shell_PID:		%d\n", entry.Shell_PID)
-	log.Printf("ShellUptime:	%d\n", entry.ShellUptime)
-	log.Printf("WorkingDirectory:		%s\n", entry.WorkingDirectory)
-	log.Printf("PrevWorkingDirectory:		%s\n", entry.PrevWorkingDirectory)
-	log.Printf("User:		%s\n", entry.User)
-	log.Printf("EUID:		%d\n", entry.EUID)
-	log.Printf("Term:		%s\n", entry.Term)
-	log.Printf("Hostname:		%s\n", entry.Hostname)
-	log.Printf("TTY:		%s\n", entry.TTY)
-	log.Printf("IsGitRepo:		%t\n", entry.IsGitRepo)
-	log.Printf("GitRepoRoot:		%s\n", entry.GitRepoRoot)
-	log.Printf("GitBranch:		%s\n", entry.GitBranch)
-	log.Printf("GitCommit:		%s\n", entry.GitCommit)
-	log.Printf("GitStatus:		%s\n", entry.GitStatus)
-	log.Printf("LoggedSuccesfully:		%t\n", entry.LoggedSuccessfully)
-	log.Println("}")
+	fmt.Printf("LogEntry: {\n")
+	fmt.Printf("EventID:		%s\n", entry.EventID)
+	fmt.Printf("Command:		%s\n", entry.Command)
+	fmt.Printf("ExitCode:		%d\n", entry.ExitCode)
+	fmt.Printf("Timestamp:		%d\n", entry.Timestamp)
+	fmt.Printf("Shell_PID:		%d\n", entry.Shell_PID)
+	fmt.Printf("ShellUptime:	%d\n", entry.ShellUptime)
+	fmt.Printf("WorkingDirectory:		%s\n", entry.WorkingDirectory)
+	fmt.Printf("PrevWorkingDirectory:		%s\n", entry.PrevWorkingDirectory)
+	fmt.Printf("User:		%s\n", entry.User)
+	fmt.Printf("EUID:		%d\n", entry.EUID)
+	fmt.Printf("Term:		%s\n", entry.Term)
+	fmt.Printf("Hostname:		%s\n", entry.Hostname)
+	fmt.Printf("TTY:		%s\n", entry.TTY)
+	fmt.Printf("IsGitRepo:		%t\n", entry.IsGitRepo)
+	fmt.Printf("GitRepoRoot:		%s\n", entry.GitRepoRoot)
+	fmt.Printf("GitBranch:		%s\n", entry.GitBranch)
+	fmt.Printf("GitCommit:		%s\n", entry.GitCommit)
+	fmt.Printf("GitStatus:		%s\n", entry.GitStatus)
+	fmt.Printf("LoggedSuccesfully:		%t\n", entry.LoggedSuccessfully)
+	fmt.Println("}")
 }
 
 func ReqToDomainLogEntry(req *pb.LogEntry) LogEntry {

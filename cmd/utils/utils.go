@@ -26,6 +26,20 @@ func GetDSN() string {
 	return dsn
 }
 
+func GetTestDSN() string {
+	host := GetEnvOrDefault("TESTDB_HOST", "localhost")
+	port := GetEnvOrDefault("TEST_DB_PORT", "5434")
+	user := GetEnvOrDefault("TEST_DB_USER", "test")
+	password := GetEnvOrDefault("TEST_DB_PASSWORD", "test")
+	dbname := GetEnvOrDefault("TEST_DB_NAME", "test_logs")
+	sslmode := GetEnvOrDefault("DB_SSLMODE", "disable")
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslmode)
+
+	return dsn
+}
+
 func GetEnvOrDefault(key, defaultVal string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -35,7 +49,7 @@ func GetEnvOrDefault(key, defaultVal string) string {
 
 func LogJSON(newEntry *pb.LogEntry, projectDir string) {
 
-	testLogFile := filepath.Join(projectDir, "testing", "logs.json")
+	testLogFile := filepath.Join(projectDir, "cmd", "test", "logs", "logs.json")
 
 	err := WriteToJSON(newEntry, testLogFile)
 	if err != nil {

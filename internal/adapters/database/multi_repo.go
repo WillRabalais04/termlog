@@ -54,7 +54,7 @@ func (r *MultiRepo) flushCache(ctx context.Context) error {
 	return nil
 }
 
-func (r *MultiRepo) Get(ctx context.Context, id int) (*domain.LogEntry, error) {
+func (r *MultiRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
 	entry, err := r.remote.Get(ctx, id)
 	if err != nil {
 		return r.cache.Get(ctx, id)

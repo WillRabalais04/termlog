@@ -2,9 +2,11 @@ core functionality:
 - standardize col names
 - maybe add org mode
 - frontend dashboard for both modes
+- possibly make delete and delete multiple return list of deleted entries?
 - add api
     - implement actual querying beyond list
     - add get logs list filters 
+    - fix testing with api (cmd/server, cmd/client, etc...)
 - org mode
     - dockerize, kubernetes deployment
     - kafka for high loads
@@ -17,6 +19,7 @@ hygiene:
 - making logger binary smaller
 - clean up .env file flow
 - testing make targets
+- check for duplicate event IDs ?
 possible new features: 
 - track currently running terminals? maybe currently running processes even? 
 - add pause/resume logging functionality

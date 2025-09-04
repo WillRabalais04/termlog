@@ -8,7 +8,7 @@ services:
     volumes:
       - logs-data:/var/lib/postgresql/data
     ports:
-      - "5433:5432" # get port and other vals from env later
+      - "5433:5432" # get from env maybe
   migrate:
     image: migrate/migrate
     volumes:
@@ -17,6 +17,30 @@ services:
     command: ["up"]
     depends_on:
       - db
+  db-test:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test_logs
+    volumes:
+      - logs-data-test:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+  migrate-test:
+    image: migrate/migrate
+    volumes:
+      - ./db/migrations/postgres:/migrations
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://test:test@db-test:5432/test_logs?sslmode=disable"]
+    command: ["up"]
+    depends_on:
+      - db-test
+    
+volumes:
+  logs-data:
+  logs-data-test:
+
+
   # kafka: # will implement multi user mode with kafka later
   #   image: apache/kafka:3.9.1
   #   container_name: kafka
@@ -38,9 +62,6 @@ services:
     
   #   volumes:
   #     - ./data/kafka:/tmp/kraft-combined-logs
-
-volumes:
-  logs-data:
   # api:
   #   build: ./cmd
   #   depends_on:

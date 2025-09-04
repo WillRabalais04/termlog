@@ -12,15 +12,16 @@ CONFIG_DIR=$(HOME)/.termlogger
 CACHE_PATH=$(CONFIG_DIR)/cache.db
 INSTALL_PATH=/usr/local/bin/termlogger
 PROJECT_ROOT=$(shell pwd)
-TEST_CACHE=./testing
+TEST_CACHE=./cmd/test/logs
 
 # hooks
 TERMLOGGER_HOOK_SCRIPT=./hooks/termlogger_hook.sh
 REMOVE_HOOK_SCRIPT=./hooks/remove_hook.sh
 
-.PHONY: all clean clean-cache clean-remote clean-test clean-proto config-dir env-setup log-bin proto remove-bin set-config remove-config remove-hook set-bin set-hook setup test-logdir uninstall help
+.PHONY: all clean clean-cache clean-remote clean-test clean-proto config-dir env-setup log-bin proto remove-bin set-config remove-config remove-hook set-bin set-hook setup setup-test setup-all test-logdir uninstall help wait-for-db wait-for-db-test start-db start-db-test check-docker
 all: help
 
+# --- BUILD/CONFIG ---
 env-setup:
 	@if [ ! -f "$(ENV_FILE)" ]; then \
 		echo "📋 No .env file found. Copying from .env.example..."; \
@@ -28,7 +29,13 @@ env-setup:
 		echo "✅ .env file created. Please configure it with your credentials."; \
 	fi
 
-set-config: env-setup
+config-dir:
+	@echo "🔧 Creating config directory at '$(CONFIG_DIR)'..."
+	@mkdir -p "$(CONFIG_DIR)"
+	@echo "✅ Config directory successfully created."
+	@echo "$(PROJECT_ROOT)" > "$(CONFIG_DIR)/project_root"
+
+set-config: env-setup config-dir
 	@echo "🔧 Installing user config to '$(BIN_ENV_FILE)'..."
 	@cp $(ENV_FILE) $(BIN_ENV_FILE)
 	@echo "✅ User config installed/updated."
@@ -47,18 +54,7 @@ set-bin: log-bin
 	@sudo cp "$(BIN_DIR)/logger" "$(INSTALL_PATH)"
 	@echo "✅ Binary installed/updated."
 
-config-dir:
-	@echo "🔧 Creating config directory at '$(CONFIG_DIR)'..."
-	@mkdir -p "$(CONFIG_DIR)"
-	@echo "✅ Config directory successfully created."
-	@echo "$(PROJECT_ROOT)" > "$(CONFIG_DIR)/project_root"
-	
-test-logdir:
-	@echo "🔧 Creating testing log directory at '$(TEST_CACHE)'..."
-	@mkdir -p "$(TEST_CACHE)"
-	@echo "✅ Test log directory successfully created."
-
-set-hook:
+set-hook: set-bin
 	@if [ -f "$(ZSH_RC)" ]; then \
 		RC_FILE="$(ZSH_RC)"; \
 	elif [ -f "$(BASH_RC)" ]; then \
@@ -76,16 +72,25 @@ set-hook:
 	echo "✅ Hook installed/updated."
 	@rm -r $(BIN_DIR)
 
-setup:
-	@echo "🚀  Starting setup..."
-	@$(MAKE) proto
-	@$(MAKE) config-dir
-	@$(MAKE) set-config
-	@$(MAKE) migrate-up > /dev/null 2>&1
-	@$(MAKE) set-bin
-	@$(MAKE) test-logdir
-	@$(MAKE) set-hook
+test-logdir:
+	@echo "🔧 Creating testing log directory at '$(TEST_CACHE)'..."
+	@mkdir -p "$(TEST_CACHE)"
+	@echo "✅ Test log directory successfully created."
 
+proto: 
+	@echo "📦 Building proto files..."
+	@buf generate
+
+# --- SETUP ---
+setup: migrate-up set-hook
+	@echo "🎉 Development setup complete."
+
+setup-test: migrate-up-test
+	@echo "🎉 Test environment setup complete."
+	
+setup-all: setup setup-test
+
+# --- UNINSTALL & CLEAN ---
 remove-bin:
 	@if [ -f "$(INSTALL_PATH)" ]; then \
 		echo "🔐 Sudo required at $(INSTALL_PATH)."; \
@@ -139,20 +144,11 @@ remove-config:
 		fi; \
 	fi
 
-uninstall:
-	@echo "🗑️  Starting uninstallation..."
-	@$(MAKE) remove-bin
-	@$(MAKE) remove-hook
-	@$(MAKE) remove-config
-	@$(MAKE) clean
+uninstall: remove-bin remove-hook remove-config clean-cache clean-test clean-proto stop-all-dbs
 	@echo "🎉 Uninstallation complete."
 	
-clean:
+clean: clean-cache clean-remote clean-test clean-proto
 	@echo "🧼 Cleaning logs.."
-	@$(MAKE) clean-cache
-	@$(MAKE) clean-remote
-	@$(MAKE) clean-test
-	@$(MAKE) clean-proto
 
 clean-cache:
 	@if [ -d "$(CACHE_PATH)" ]; then \
@@ -170,9 +166,8 @@ clean-cache:
 		echo "✅ Nothing to remove!"; \
 	fi
 
-clean-remote:
+clean-remote: migrate-down
 	@echo "🗑️ Deleting contents of postgres DB";
-	@$(MAKE) migrate-down > /dev/null 2>&1;
 	@echo "✅ Deletion complete.";
 
 clean-test:
@@ -194,34 +189,88 @@ clean-test:
 clean-proto:
 	@rm -rf api/gen/*
 
-proto: 
-	@buf generate
+# --- DOCKER ---
+check-docker:
+	@if ! docker info > /dev/null 2>&1; then \
+		echo ""; \
+		echo "❌ Docker is not running. Start Docker Desktop and run again."; \
+		echo ""; \
+		exit 1; \
+	fi
 
-migrate-up:
-	docker-compose run --rm migrate
+start-db: check-docker
+	@echo "🐘 Starting development database..."
+	@docker-compose up -d db > /dev/null 2>&1
+	@echo "✅ Postgres database is running."
 
-migrate-down:
-	docker-compose run --rm migrate down 1
+stop-db: check-docker
+	@echo "🐘 Stopping development database..."
+	@docker-compose stop db > /dev/null 2>&1
+	@echo "✅ Postgres database stopped."
+
+start-db-test: check-docker
+	@echo "🐘 Starting Postgres test database..."
+	@docker-compose up -d db-test > /dev/null 2>&1
+	@echo "✅ Postgres test database is running."
+
+stop-db-test: check-docker
+	@echo "🐘 Stopping test database..."
+	@docker-compose stop db-test > /dev/null 2>&1
+	@echo "✅ Postgres test database stopped."
+
+stop-all-dbs: check-docker
+	@echo "🐘 Stopping all services and removing containers, networks, and volumes..."
+	@docker-compose down --volumes > /dev/null 2>&1
+
+wait-for-db: start-db
+	@echo "⏳ Waiting for the development database to be ready..."
+	@until docker-compose exec db pg_isready -U postgres -q; do sleep 1; done
+	@echo "✅ Development database is ready."
+
+wait-for-db-test: start-db-test
+	@echo "⏳ Waiting for the test database to be ready..."
+	@until docker-compose exec db-test pg_isready -U test -q; do sleep 1; done
+	@echo "✅ Test database is ready."
+
+# --- DB MIGRATIONS ---
+migrate-up: wait-for-db proto set-config
+	@echo "🚀 Applying migrations to development database..."
+	@docker-compose run --rm migrate up > /dev/null 2>&1
+
+migrate-down: check-docker
+	@echo "⏪ Reverting last migration on development database..."
+	@docker-compose run --rm migrate down 1 > /dev/null 2>&1
+
+migrate-up-test: wait-for-db-test proto test-logdir
+	@echo "🚀 Applying migrations to test database..."
+	@docker-compose run --rm migrate-test up > /dev/null 2>&1
+
+migrate-down-test: check-docker
+	@echo "⏪ Reverting last migration on test database..."
+	@docker-compose run --rm migrate-test down 1 > /dev/null 2>&1
 
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
+	@echo "Primary Targets:"
+	@echo "  setup           Builds and installs the full development environment (binary, hooks, db)."
+	@echo "  setup-test      Builds and prepares the test environment (db and migrations)."
+	@echo "  setup-all       Runs both 'setup' and 'setup-test'."
+	@echo "  uninstall       Removes the binary, hooks, configs, and stops all docker containers."
+	@echo ""
+	@echo "Development DB:"
+	@echo "  start-db        Starts the development postgres container."
+	@echo "  stop-db         Stops the development postgres container."
+	@echo "  migrate-up      Applies all pending migrations to the development database."
+	@echo "  migrate-down    Reverts the last migration on the development database."
+	@echo ""
+	@echo "Test DB:"
+	@echo "  start-db-test   Starts the test postgres container."
+	@echo "  stop-db-test    Stops the test postgres container."
+	@echo "  migrate-up-test Applies all pending migrations to the test database."
+	@echo "  migrate-down-test Reverts the last migration on the test database."
+	@echo ""
+	@echo "Other Targets:"
 	@echo "  all             Shows this help message."
-	@echo " env-setup        Creates .env file from template if it doesn't already exist."
-	@echo "  log-bin          Compiles the logger Go source file."
-	@echo "  set-bin          Places the compiled binary into the user's binary folder."
-	@echo "  config-dir       Creates the configuration directory."
-	@echo "  test-log-dir      Creates the testing log directory."
-	@echo "  set-hook         Installs the shell hook for termlogger."
-	@echo "  setup           Builds and installs the termlogger binary and shell hook."
-	@echo "  uninstall       Removes the termlogger binary, shell hook, and optionally the config directory."
-	@echo "  remove-bin       Removes the installed binary."
-	@echo "  remove-hook      Removes the shell hook."
-	@echo "  remove-config Removes the configuration directory."
-	@echo "  clean           Deletes main and testing log files."
-	@echo "  clean-cache         Deletes main log files."
-	@echo "  clean-test         Deletes testing log files."
-	@echo "  proto           Builds proto files."
-	@echo "  clean-proto      Removes proto files."
+	@echo "  clean           Deletes main and testing log files and cleans remote DB."
 	@echo "  help            Shows this help message."

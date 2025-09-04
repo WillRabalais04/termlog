@@ -112,7 +112,7 @@ func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 			entry.EventID,
 			entry.Command,
 			entry.ExitCode,
-			time.Unix(entry.Timestamp, 0),
+			entry.Timestamp,
 			entry.Shell_PID,
 			entry.ShellUptime,
 			entry.WorkingDirectory,
@@ -140,9 +140,9 @@ func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 	return err
 }
 
-// switch to calling list and with a filter that has event_id=id, user access and limit = 1
-func (r *LogRepo) Get(ctx context.Context, id int) (*domain.LogEntry, error) {
-	query := r.sb.Select("logs").Where(sq.Eq{"event_id": id})
+// switch to calling list and with a filter that has event_id=id, user access and limit = 1 (if faster)
+func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
+	query := r.sb.Select(logColumns...).From("logs").Where(sq.Eq{"event_id": id})
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {
@@ -285,13 +285,11 @@ func scanLogEntry(scanner interface {
 	Scan(dest ...interface{}) error
 }) (*domain.LogEntry, error) {
 	var entry domain.LogEntry
-	var ts time.Time
-
 	err := scanner.Scan(
 		&entry.EventID,
 		&entry.Command,
 		&entry.ExitCode,
-		&ts,
+		&entry.Timestamp,
 		&entry.Shell_PID,
 		&entry.ShellUptime,
 		&entry.WorkingDirectory,
@@ -313,8 +311,6 @@ func scanLogEntry(scanner interface {
 	if err != nil {
 		return nil, err
 	}
-
-	entry.Timestamp = ts.Unix()
 
 	return &entry, nil
 }

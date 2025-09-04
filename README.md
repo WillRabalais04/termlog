@@ -3,6 +3,12 @@
 # setup:
 - make setup
 
+# uninstall: 
+make uninstall
+
 # test: 
-- run server: 'go run ./cmd/server/server.go'
-- run client: 'go run ./cmd/test/dummy_client.go'
+before testing run 'make stop-db-test'
+to test modify cmd/test/access_data.go and run with 'go run cmd/test/access_data.go'
+
+# help
+to see more run make help

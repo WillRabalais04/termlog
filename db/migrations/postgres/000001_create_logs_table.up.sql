@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS logs (
   event_id UUID PRIMARY KEY, 
   command TEXT NOT NULL,
   exit_code INT,
-  ts TIMESTAMPTZ NOT NULL,          
+  ts BIGINT,          
   shell_pid INT,
   shell_uptime BIGINT, 
   cwd TEXT,     

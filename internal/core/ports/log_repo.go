@@ -8,7 +8,7 @@ import (
 
 type LogRepositoryPort interface {
 	Log(ctx context.Context, entry *domain.LogEntry) error
-	Get(ctx context.Context, id int) (*domain.LogEntry, error)
+	Get(ctx context.Context, id string) (*domain.LogEntry, error)
 	List(ctx context.Context, filters *LogQuery) ([]*domain.LogEntry, error)
 	Delete(ctx context.Context, id string) error
 	DeleteMultiple(ctx context.Context, filters *LogQuery) error
@@ -23,7 +23,7 @@ type LogQuery struct {
 	Offset               uint64
 	OrderBy              *string
 	GitRepo              *bool
-	Timestamp            *string
+	Timestamp            *int64
 	ShellPID             *uint64
 	ShellUptime          *uint64
 	WorkingDirectory     *string
