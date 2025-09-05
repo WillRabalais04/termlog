@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package log;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/willrabalais/terminalLog/api/gen/log;log";
 
 message LogEntry {
@@ -27,10 +29,65 @@ message LogEntry {
   bool logged_successfully = 20;
 }
 
-service LogService {
-  rpc Log(LogEntry) returns (LogResponse);
+message LogFilter {
+  optional string event_id = 1;
+  optional string command = 2;
+  optional string user = 3;
+  optional int32 exit_code = 4;
+  optional bool is_git_repo = 5;
+  google.protobuf.Timestamp start_time = 6;
+  google.protobuf.Timestamp end_time = 7;
+  optional int32 shell_PID = 8;
+  optional uint32 EUID = 9;
+  optional string working_directory = 10;
+  optional string term = 11;
+  optional string hostname = 12;
+  optional string git_repo_root = 13;
+  optional string git_branch = 14;
+  optional bool logged_successfully = 15;
+}
+
+message LogRequest {
+  LogEntry entry = 1;
 }
 
 message LogResponse {
   bool success = 1;
+  string event_id = 2;
+}
+
+message GetLogRequest {
+  string event_id = 1;
+}
+
+message ListLogsRequest {
+  LogFilter filter = 1;
+}
+
+message ListLogsResponse {
+  repeated LogEntry logs = 1;
+}
+
+message DeleteLogRequest {
+  string event_id = 1;
+}
+
+message DeleteLogResponse {
+  bool success = 1;
+}
+
+message DeleteMultipleLogsRequest {
+  LogFilter filter = 1;
+}
+message DeleteMultipleLogsResponse {
+  bool success = 1;
+  int64 deleted_count = 2;
+}
+
+service LogService {
+  rpc Log(LogRequest) returns (LogResponse);
+  rpc GetLog(GetLogRequest) returns (LogEntry);
+  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);
+  rpc DeleteLog(DeleteLogRequest) returns (DeleteLogResponse);
+  rpc DeleteMultipleLogs(DeleteMultipleLogsRequest) returns (DeleteMultipleLogsResponse);
 }

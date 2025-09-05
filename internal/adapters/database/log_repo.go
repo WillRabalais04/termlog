@@ -153,7 +153,7 @@ func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) 
 	return scanLogEntry(row)
 }
 
-func (r *LogRepo) List(ctx context.Context, filters *ports.LogQuery) ([]*domain.LogEntry, error) {
+func (r *LogRepo) List(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
 	query := sq.StatementBuilderType(r.sb.Select(logColumns...).From("logs"))
 	query = applyFilters(query, filters)
 	selectQuery := sq.SelectBuilder(query)
@@ -196,10 +196,10 @@ func (r *LogRepo) List(ctx context.Context, filters *ports.LogQuery) ([]*domain.
 }
 
 func (r *LogRepo) Delete(ctx context.Context, id string) error {
-	return r.DeleteMultiple(ctx, &ports.LogQuery{EventID: &id})
+	return r.DeleteMultiple(ctx, &ports.LogFilter{EventID: &id})
 }
 
-func (r *LogRepo) DeleteMultiple(ctx context.Context, filters *ports.LogQuery) error {
+func (r *LogRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) error {
 	query := sq.StatementBuilderType(r.sb.Delete("logs"))
 	query = applyFilters(query, filters)
 
@@ -216,7 +216,7 @@ func (r *LogRepo) DeleteMultiple(ctx context.Context, filters *ports.LogQuery) e
 }
 
 // add pagination and user access filtering down the line
-func applyFilters(builder sq.StatementBuilderType, filters *ports.LogQuery) sq.StatementBuilderType {
+func applyFilters(builder sq.StatementBuilderType, filters *ports.LogFilter) sq.StatementBuilderType {
 	if filters.EventID != nil {
 		builder = builder.Where(sq.Eq{"event_id": *filters.EventID})
 	}
@@ -227,7 +227,7 @@ func applyFilters(builder sq.StatementBuilderType, filters *ports.LogQuery) sq.S
 		builder = builder.Where(sq.Eq{"exit_code": *filters.ExitCode})
 	}
 	// if filters.Limit != nil { // implement
-	// 	builder = builder.Where(sq.Eq{"logged_successfully": *filters.LoggedSuccesfully})
+	// 	builder = builder.Where(sq.Eq{"logged_successfully": *filters.LoggedSuccessfully})
 	// }
 	if filters.Timestamp != nil {
 		builder = builder.Where(sq.Eq{"ts": *filters.Timestamp})
@@ -274,8 +274,8 @@ func applyFilters(builder sq.StatementBuilderType, filters *ports.LogQuery) sq.S
 	if filters.Commit != nil {
 		builder = builder.Where(sq.Eq{"git_commit": *filters.Commit})
 	}
-	if filters.LoggedSuccesfully != nil {
-		builder = builder.Where(sq.Eq{"logged_successfully": *filters.LoggedSuccesfully})
+	if filters.LoggedSuccessfully != nil {
+		builder = builder.Where(sq.Eq{"logged_successfully": *filters.LoggedSuccessfully})
 	}
 
 	return builder

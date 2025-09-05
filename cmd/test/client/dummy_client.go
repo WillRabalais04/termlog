@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	gen "github.com/WillRabalais04/terminalLog/api/gen"
+	pb "github.com/WillRabalais04/terminalLog/api/gen"
 	grpc_adapter "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
 )
 
@@ -22,11 +22,11 @@ func main() {
 	}
 	defer conn.Close()
 
-	client := gen.NewLogServiceClient(conn)
+	client := pb.NewLogServiceClient(conn)
 
 	reader := bufio.NewReader(os.Stdin)
 	var text string
-	var response *gen.LogResponse
+	var response *pb.LogResponse
 
 	for {
 		fmt.Print("Enter text: ")
@@ -34,8 +34,7 @@ func main() {
 		if text == "" || text == "exit" {
 			break
 		}
-
-		request := &gen.LogEntry{
+		entry := &pb.LogEntry{
 			Command:              text,
 			ExitCode:             0,
 			Timestamp:            time.Now().Unix(),
@@ -55,6 +54,9 @@ func main() {
 			GitCommit:            "2342aga",
 			GitStatus:            "no diff",
 			LoggedSuccessfully:   true,
+		}
+		request := &pb.LogRequest{
+			Entry: entry,
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

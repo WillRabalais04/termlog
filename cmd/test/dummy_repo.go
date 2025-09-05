@@ -49,7 +49,7 @@ func testGet(ctx context.Context, svc service.LogService) {
 }
 
 func testList(ctx context.Context, svc service.LogService) {
-	entries, err := svc.List(ctx, &ports.LogQuery{})
+	entries, err := svc.List(ctx, &ports.LogFilter{})
 	prettyPrint("list", entries, err)
 }
 
@@ -59,15 +59,14 @@ func testDelete(ctx context.Context, svc service.LogService) {
 }
 
 func testDeleteMultiple(ctx context.Context, svc service.LogService) {
-	gitRepo := false
-	err := svc.DeleteMultiple(ctx, &ports.LogQuery{
+	gitRepo := true
+	err := svc.DeleteMultiple(ctx, &ports.LogFilter{
 		GitRepo: &gitRepo,
 	})
 	if err != nil {
 		log.Printf("testDeleteMultiple failed: %v", err)
 	}
 	prettyPrint("delete multiple", nil, err)
-
 }
 
 func prettyPrint(testName string, entries []*domain.LogEntry, err error) {
@@ -128,14 +127,14 @@ func getMultiRepo() *database.MultiRepo {
 
 func main() {
 	loadEnv()
-	testSVC := service.NewLogService(getRemoteRepo())
+	testSVC := service.NewLogService(getLocalRepo())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// testLog(ctx, *testSVC)
-	// testList(ctx, *testSVC)
-	// testGet(ctx, *testSVC)
-	// testDelete(ctx, *testSVC)
+	testLog(ctx, *testSVC)
+	testList(ctx, *testSVC)
+	testGet(ctx, *testSVC)
+	testDelete(ctx, *testSVC)
 	testDeleteMultiple(ctx, *testSVC)
 }

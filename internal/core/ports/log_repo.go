@@ -9,12 +9,12 @@ import (
 type LogRepositoryPort interface {
 	Log(ctx context.Context, entry *domain.LogEntry) error
 	Get(ctx context.Context, id string) (*domain.LogEntry, error)
-	List(ctx context.Context, filters *LogQuery) ([]*domain.LogEntry, error)
+	List(ctx context.Context, filters *LogFilter) ([]*domain.LogEntry, error)
 	Delete(ctx context.Context, id string) error
-	DeleteMultiple(ctx context.Context, filters *LogQuery) error
+	DeleteMultiple(ctx context.Context, filters *LogFilter) error
 }
 
-type LogQuery struct {
+type LogFilter struct {
 	EventID              *string // verify accessing by pointer is best practices but works for nil check
 	Command              *string
 	User                 *string
@@ -24,6 +24,8 @@ type LogQuery struct {
 	OrderBy              *string
 	GitRepo              *bool
 	Timestamp            *int64
+	StartTime            *int64
+	EndTime              *int64
 	ShellPID             *uint64
 	ShellUptime          *uint64
 	WorkingDirectory     *string
@@ -36,5 +38,5 @@ type LogQuery struct {
 	GitRepoRoot          *string
 	Branch               *string
 	Commit               *string
-	LoggedSuccesfully    *bool
+	LoggedSuccessfully   *bool
 }

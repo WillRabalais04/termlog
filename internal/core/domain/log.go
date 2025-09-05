@@ -2,8 +2,6 @@ package domain
 
 import (
 	"fmt"
-
-	pb "github.com/WillRabalais04/terminalLog/api/gen"
 )
 
 type LogEntry struct {
@@ -50,31 +48,6 @@ func PrintLogEntry(entry *LogEntry) {
 	fmt.Printf("GitBranch:		%s\n", entry.GitBranch)
 	fmt.Printf("GitCommit:		%s\n", entry.GitCommit)
 	fmt.Printf("GitStatus:		%s\n", entry.GitStatus)
-	fmt.Printf("LoggedSuccesfully:		%t\n", entry.LoggedSuccessfully)
+	fmt.Printf("LoggedSuccessfully:		%t\n", entry.LoggedSuccessfully)
 	fmt.Println("}")
-}
-
-func ReqToDomainLogEntry(req *pb.LogEntry) LogEntry {
-	return LogEntry{
-		EventID:              req.EventId,
-		Command:              req.Command,
-		ExitCode:             req.ExitCode,
-		Timestamp:            req.Timestamp,
-		Shell_PID:            req.Shell_PID,
-		ShellUptime:          req.ShellUptime,
-		WorkingDirectory:     req.WorkingDirectory,
-		PrevWorkingDirectory: req.PrevWorkingDirectory,
-		User:                 req.User,
-		EUID:                 req.EUID,
-		Term:                 req.Term,
-		Hostname:             req.Hostname,
-		SSHClient:            req.SSHClient,
-		TTY:                  req.TTY,
-		IsGitRepo:            req.IsGitRepo,
-		GitRepoRoot:          req.GitRepoRoot,
-		GitBranch:            req.GitBranch,
-		GitCommit:            req.GitCommit,
-		GitStatus:            req.GitStatus,
-		LoggedSuccessfully:   req.LoggedSuccessfully,
-	}
 }

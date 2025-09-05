@@ -22,7 +22,7 @@ func (s *LogService) Log(ctx context.Context, entry *domain.LogEntry) error {
 func (s *LogService) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
 	return s.repo.Get(ctx, id)
 }
-func (s *LogService) List(ctx context.Context, filters *ports.LogQuery) ([]*domain.LogEntry, error) {
+func (s *LogService) List(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
 	return s.repo.List(ctx, filters)
 }
 
@@ -30,6 +30,6 @@ func (s *LogService) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 
 }
-func (s *LogService) DeleteMultiple(ctx context.Context, filters *ports.LogQuery) error {
+func (s *LogService) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) error {
 	return s.repo.DeleteMultiple(ctx, filters)
 }

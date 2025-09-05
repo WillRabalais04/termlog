@@ -34,7 +34,7 @@ func (r *MultiRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 }
 
 func (r *MultiRepo) flushCache(ctx context.Context) error {
-	entries, err := r.cache.List(ctx, &ports.LogQuery{}) // empty filter should return all
+	entries, err := r.cache.List(ctx, &ports.LogFilter{}) // empty filter should return all
 
 	if err != nil {
 		return fmt.Errorf("reading cache failed: %w", err)
@@ -62,7 +62,7 @@ func (r *MultiRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error
 	return entry, nil
 }
 
-func (r *MultiRepo) List(ctx context.Context, filters *ports.LogQuery) ([]*domain.LogEntry, error) {
+func (r *MultiRepo) List(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
 	entries, err := r.remote.List(ctx, filters)
 	if err != nil {
 		return r.cache.List(ctx, filters)
@@ -78,7 +78,7 @@ func (r *MultiRepo) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *MultiRepo) DeleteMultiple(ctx context.Context, filters *ports.LogQuery) error {
+func (r *MultiRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) error {
 	err := r.remote.DeleteMultiple(ctx, filters)
 	if err != nil {
 		return r.cache.DeleteMultiple(ctx, filters)

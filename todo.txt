@@ -1,8 +1,8 @@
 core functionality:
 - standardize col names
-- maybe add org mode
 - frontend dashboard for both modes
 - possibly make delete and delete multiple return list of deleted entries?
+- pagination
 - add api
     - implement actual querying beyond list
     - add get logs list filters 
@@ -13,7 +13,6 @@ core functionality:
     - users & devices (keycloak maybe)
 hygiene: 
 - track error handling better it gets silenced somewhere
-- clean up makefile
 - unit tests
 - setup test docker image for test postgres db
 - making logger binary smaller
@@ -21,6 +20,7 @@ hygiene:
 - testing make targets
 - check for duplicate event IDs ?
 possible new features: 
+- add get cache and get remote requests to api
 - track currently running terminals? maybe currently running processes even? 
 - add pause/resume logging functionality
 - encrypt logs
@@ -28,4 +28,5 @@ possible new features:
 - grafana logging
 - autogen better postgres passwords
 - add performant mode that doesn't call git status every time or maybe no git mode or just let users opt into what they want to log every time
-- create a cache.db of testing logs or add random inputs for logging
+- benchmarking?
+- add random dummy logs for testing
