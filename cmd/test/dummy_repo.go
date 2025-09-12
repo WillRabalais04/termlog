@@ -59,10 +59,13 @@ func testDelete(ctx context.Context, svc service.LogService) {
 }
 
 func testDeleteMultiple(ctx context.Context, svc service.LogService) {
-	gitRepo := true
-	err := svc.DeleteMultiple(ctx, &ports.LogFilter{
-		GitRepo: &gitRepo,
-	})
+	filter := &ports.LogFilter{
+		FilterTerms: map[string]ports.FilterValues{
+			"git_repo": {Values: []string{"true"}},
+		},
+		FilterMode: ports.AND,
+	}
+	err := svc.DeleteMultiple(ctx, filter)
 	if err != nil {
 		log.Printf("testDeleteMultiple failed: %v", err)
 	}
@@ -96,6 +99,9 @@ func loadEnv() {
 }
 func getLocalRepo() *database.LogRepo {
 	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("could not get home dir: %v", err)
+	}
 	cachePath := filepath.Join(utils.GetProjectRoot(homeDir), "cmd", "test", "logs", "cache.db")
 	cache, err := database.NewRepo(&database.Config{
 		Driver:       "sqlite3",
@@ -127,6 +133,7 @@ func getMultiRepo() *database.MultiRepo {
 
 func main() {
 	loadEnv()
+
 	testSVC := service.NewLogService(getLocalRepo())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

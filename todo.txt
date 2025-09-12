@@ -1,6 +1,7 @@
 core functionality:
 - standardize col names
 - frontend dashboard for both modes
+- make it so that you can pick what to log 
 - possibly make delete and delete multiple return list of deleted entries?
 - pagination
 - add api

@@ -1,4 +1,5 @@
 .DS_Store
 ./cmd/test/logs/*
 .env
-./api/gen/
+api/gen/*
+cmd/test/logs/*

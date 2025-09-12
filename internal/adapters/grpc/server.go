@@ -118,64 +118,34 @@ func logEntryFromProto(entry *pb.LogEntry) *domain.LogEntry {
 		LoggedSuccessfully:   entry.LoggedSuccessfully,
 	}
 }
+
 func filterFromProto(filter *pb.LogFilter) *ports.LogFilter {
 	if filter == nil {
 		return &ports.LogFilter{}
 	}
 
-	query := &ports.LogFilter{}
-
-	if filter.EventId != nil {
-		query.EventID = filter.EventId
-	}
-	if filter.Command != nil {
-		query.Command = filter.Command
-	}
-	if filter.User != nil {
-		query.User = filter.User
-	}
-	temp := int(*filter.ExitCode) // clean
-	if filter.ExitCode != nil {
-		query.ExitCode = &temp
-	}
-	if filter.IsGitRepo != nil {
-		query.GitRepo = filter.IsGitRepo
-	}
-	temp2 := uint64(*filter.Shell_PID) // clean
-	if filter.Shell_PID != nil {
-		query.ShellPID = &temp2
-	}
-	temp2 = uint64(*filter.Shell_PID) // clean
-	if filter.EUID != nil {
-		query.EUID = &temp2
-	}
-	if filter.WorkingDirectory != nil {
-		query.WorkingDirectory = filter.WorkingDirectory
-	}
-	if filter.Term != nil {
-		query.Term = filter.Term
-	}
-	if filter.Hostname != nil {
-		query.Hostname = filter.Hostname
-	}
-	if filter.GitRepoRoot != nil {
-		query.GitRepoRoot = filter.GitRepoRoot
-	}
-	if filter.GitBranch != nil {
-		query.Branch = filter.GitBranch
-	}
-	if filter.LoggedSuccessfully != nil {
-		query.LoggedSuccessfully = filter.LoggedSuccessfully
+	portsFilterTerms := make(map[string]ports.FilterValues)
+	for key, values := range filter.FilterTerms {
+		portsFilterTerms[key] = ports.FilterValues{
+			Values: values.Values,
+		}
 	}
 
-	if filter.StartTime != nil && filter.StartTime.IsValid() {
-		startTime := filter.StartTime.GetSeconds()
-		query.StartTime = &startTime
+	portsSearchTerms := make(map[string]ports.SearchValues)
+	for key, values := range filter.SearchTerms {
+		portsSearchTerms[key] = ports.SearchValues{
+			Values: values.Values,
+		}
 	}
-	if filter.EndTime != nil && filter.EndTime.IsValid() {
-		endTime := filter.EndTime.GetSeconds()
-		query.EndTime = &endTime
+	return &ports.LogFilter{ // review type selection
+		FilterTerms: portsFilterTerms,
+		FilterMode:  ports.Mode(*filter.FilterMode),
+		SearchTerms: portsSearchTerms,
+		SearchMode:  ports.Mode(*filter.SearchMode),
+		Limit:       *filter.Limit,
+		Offset:      *filter.Offset,
+		OrderBy:     filter.OrderBy,
+		StartTime:   &filter.StartTime.Seconds,
+		EndTime:     &filter.EndTime.Seconds,
 	}
-
-	return query
 }

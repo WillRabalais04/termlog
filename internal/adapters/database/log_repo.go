@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,26 +24,57 @@ var logColumns = []string{
 	"git_status", "logged_successfully",
 }
 
-var allowedOrderings = map[string]struct{}{
-	"event_id":           struct{}{}, // why are these commented out?
-	"exit_code":          struct{}{},
-	"ts":                 struct{}{},
-	"shell_pid":          struct{}{},
-	"shell_uptime":       struct{}{},
-	"cwd":                struct{}{},
-	"prev_cwd":           struct{}{},
-	"user_name":          struct{}{},
-	"euid":               struct{}{},
-	"term":               struct{}{},
-	"hostname":           struct{}{},
-	"ssh_client":         struct{}{},
-	"tty":                struct{}{},
-	"git_repo":           struct{}{},
-	"git_repo_root":      struct{}{},
-	"git_branch":         struct{}{},
-	"git_commit":         struct{}{},
-	"git_status":         struct{}{},
-	"logged_succesfully": struct{}{},
+var columnMetadata = map[string]struct {
+	Type        interface{}
+	IsOrderable bool
+	IsExact     bool
+	IsFuzzy     bool
+}{
+	"event_id":            {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"command":             {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"exit_code":           {Type: int32(0), IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"ts":                  {Type: int64(0), IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"shell_pid":           {Type: int32(0), IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"shell_uptime":        {Type: int64(0), IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"cwd":                 {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"prev_cwd":            {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"user_name":           {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"euid":                {Type: int32(0), IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"term":                {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"hostname":            {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"ssh_client":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"tty":                 {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"is_git_repo":         {Type: false, IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"git_repo_root":       {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"git_branch":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"git_commit":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"git_status":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
+	"logged_successfully": {Type: false, IsOrderable: true, IsExact: true, IsFuzzy: false},
+}
+
+var allowedOrderings map[string]struct{}
+
+func init() {
+	allowedOrderings = make(map[string]struct{}, len(logColumns))
+	for _, col := range logColumns {
+		allowedOrderings[col] = struct{}{}
+	}
+}
+
+func convertValue(val string, targetType interface{}) (interface{}, error) {
+	switch targetType.(type) {
+	case string:
+		return val, nil
+	case int32:
+		i, err := strconv.ParseInt(val, 10, 32)
+		return int32(i), err
+	case int64:
+		return strconv.ParseInt(val, 10, 64)
+	case bool:
+		return strconv.ParseBool(val)
+	default:
+		return nil, fmt.Errorf("unsupported type: %T", targetType)
+	}
 }
 
 var defaultOrdering = "ts"
@@ -94,11 +126,13 @@ func NewRepo(cfg *Config) (*LogRepo, error) {
 	}
 
 	var placeholder sq.PlaceholderFormat
-	if cfg.Driver == "pgx" {
+	switch cfg.Driver {
+	case "pgx":
 		placeholder = sq.Dollar
-	}
-	if cfg.Driver == "sqlite3" {
+	case "sqlite3":
 		placeholder = sq.Question
+	default:
+		return nil, fmt.Errorf("invalid db driver name (should pgx or sqlite3)")
 	}
 
 	return &LogRepo{db: db, sb: sq.StatementBuilder.PlaceholderFormat(placeholder)}, nil
@@ -142,30 +176,34 @@ func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 
 // switch to calling list and with a filter that has event_id=id, user access and limit = 1 (if faster)
 func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
-	query := r.sb.Select(logColumns...).From("logs").Where(sq.Eq{"event_id": id})
-
-	sqlStr, args, err := query.ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build get query: %w", err)
+	filter := &ports.LogFilter{
+		FilterTerms: map[string]ports.FilterValues{
+			"event_id": {Values: []string{id}},
+		},
+		FilterMode: ports.AND,
 	}
-	row := r.db.QueryRowContext(ctx, sqlStr, args...)
 
-	return scanLogEntry(row)
+	entries, err := r.List(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute get query: %w", err)
+	}
+
+	return entries[0], nil
 }
 
-func (r *LogRepo) List(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
+func (r *LogRepo) List(ctx context.Context, filter *ports.LogFilter) ([]*domain.LogEntry, error) {
 	query := sq.StatementBuilderType(r.sb.Select(logColumns...).From("logs"))
-	query = applyFilters(query, filters)
+	query = applyFilters(query, filter)
 	selectQuery := sq.SelectBuilder(query)
 
-	orderBy, orderDir := validateOrdering(filters.OrderBy)
+	orderBy, orderDir := validateOrdering(filter.OrderBy)
 	selectQuery = selectQuery.OrderBy(fmt.Sprintf("%s %s", orderBy, orderDir))
 
-	if filters.Limit > 0 {
-		selectQuery = selectQuery.Limit(filters.Limit)
+	if filter.Limit > 0 {
+		selectQuery = selectQuery.Limit(filter.Limit)
 	}
-	if filters.Offset > 0 {
-		selectQuery = selectQuery.Offset(filters.Offset)
+	if filter.Offset > 0 {
+		selectQuery = selectQuery.Offset(filter.Offset)
 	}
 
 	sqlStr, args, err := selectQuery.ToSql()
@@ -196,12 +234,18 @@ func (r *LogRepo) List(ctx context.Context, filters *ports.LogFilter) ([]*domain
 }
 
 func (r *LogRepo) Delete(ctx context.Context, id string) error {
-	return r.DeleteMultiple(ctx, &ports.LogFilter{EventID: &id})
+	filter := &ports.LogFilter{
+		FilterTerms: map[string]ports.FilterValues{
+			"event_id": {Values: []string{id}},
+		},
+		FilterMode: ports.AND,
+	}
+	return r.DeleteMultiple(ctx, filter)
 }
 
-func (r *LogRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) error {
+func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *ports.LogFilter) error {
 	query := sq.StatementBuilderType(r.sb.Delete("logs"))
-	query = applyFilters(query, filters)
+	query = applyFilterTerms(query, filter.FilterTerms, filter.FilterMode) // use applyfilters maybe?
 
 	sqlStr, args, err := (sq.DeleteBuilder(query)).ToSql()
 	if err != nil {
@@ -215,69 +259,78 @@ func (r *LogRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) 
 	return nil
 }
 
-// add pagination and user access filtering down the line
-func applyFilters(builder sq.StatementBuilderType, filters *ports.LogFilter) sq.StatementBuilderType {
-	if filters.EventID != nil {
-		builder = builder.Where(sq.Eq{"event_id": *filters.EventID})
+func applyFilters(builder sq.StatementBuilderType, filter *ports.LogFilter) sq.StatementBuilderType {
+	builder = applyFilterTerms(builder, filter.FilterTerms, filter.FilterMode)
+	builder = applySearchTerms(builder, filter.SearchTerms, filter.SearchMode)
+	// add user permissions filter later
+	if filter.StartTime != nil {
+		builder = builder.Where(sq.GtOrEq{"ts": *filter.StartTime})
 	}
-	if filters.Command != nil {
-		builder = builder.Where(sq.Like{"command": *filters.Command})
+	if filter.EndTime != nil {
+		builder = builder.Where(sq.LtOrEq{"ts": *filter.EndTime})
 	}
-	if filters.ExitCode != nil {
-		builder = builder.Where(sq.Eq{"exit_code": *filters.ExitCode})
-	}
-	// if filters.Limit != nil { // implement
-	// 	builder = builder.Where(sq.Eq{"logged_successfully": *filters.LoggedSuccessfully})
-	// }
-	if filters.Timestamp != nil {
-		builder = builder.Where(sq.Eq{"ts": *filters.Timestamp})
-	}
-	if filters.ShellPID != nil {
-		builder = builder.Where(sq.Eq{"shell_pid": *filters.ShellPID})
-	}
-	if filters.ShellUptime != nil {
-		builder = builder.Where(sq.Eq{"shell_uptime": *filters.ShellUptime})
-	}
-	if filters.WorkingDirectory != nil {
-		builder = builder.Where(sq.Eq{"cwd": *filters.WorkingDirectory})
-	}
-	if filters.PrevWorkingDirectory != nil {
-		builder = builder.Where(sq.Eq{"prev_cwd": *filters.PrevWorkingDirectory})
-	}
-	if filters.User != nil {
-		builder = builder.Where(sq.Eq{"user_name": *filters.User})
-	}
-	if filters.EUID != nil {
-		builder = builder.Where(sq.Eq{"euid": *filters.EUID})
-	}
-	if filters.Term != nil {
-		builder = builder.Where(sq.Eq{"term": *filters.Term})
-	}
-	if filters.Hostname != nil {
-		builder = builder.Where(sq.Eq{"hostname": *filters.Hostname})
-	}
-	if filters.SSHClient != nil {
-		builder = builder.Where(sq.Eq{"ssh_client": *filters.SSHClient})
-	}
-	if filters.TTY != nil {
-		builder = builder.Where(sq.Eq{"tty": *filters.TTY})
-	}
-	if filters.GitRepo != nil {
-		builder = builder.Where(sq.Eq{"git_repo": *filters.GitRepo})
-	}
-	if filters.GitRepoRoot != nil {
-		builder = builder.Where(sq.Eq{"git_repo_root": *filters.GitRepoRoot})
-	}
-	if filters.Branch != nil {
-		builder = builder.Where(sq.Eq{"branch": *filters.Branch})
-	}
-	if filters.Commit != nil {
-		builder = builder.Where(sq.Eq{"git_commit": *filters.Commit})
-	}
-	if filters.LoggedSuccessfully != nil {
-		builder = builder.Where(sq.Eq{"logged_successfully": *filters.LoggedSuccessfully})
-	}
+	return builder
+}
 
+func applyFilterTerms(builder sq.StatementBuilderType, filterTerms map[string]ports.FilterValues, mode ports.Mode) sq.StatementBuilderType {
+	if len(filterTerms) == 0 {
+		return builder
+	}
+	var allFieldConditions []sq.Sqlizer
+	for field, values := range filterTerms {
+		metadata, ok := columnMetadata[field]
+		if !ok || !metadata.IsExact {
+			continue
+		}
+		var fieldConditions []sq.Sqlizer
+		for _, val := range values.Values {
+			typedValue, err := convertValue(val, metadata.Type)
+			if err != nil {
+				fmt.Printf("Error converting value for field '%s': %v\n", field, err)
+				continue
+			}
+			fieldConditions = append(fieldConditions, sq.Eq{field: typedValue})
+		}
+		if len(fieldConditions) > 0 {
+			allFieldConditions = append(allFieldConditions, sq.Or(fieldConditions))
+		}
+	}
+	if len(allFieldConditions) > 0 {
+		if mode == ports.AND {
+			builder = builder.Where(sq.And(allFieldConditions))
+		} else {
+			builder = builder.Where(sq.Or(allFieldConditions))
+		}
+	}
+	return builder
+}
+
+func applySearchTerms(builder sq.StatementBuilderType, searchTerms map[string]ports.SearchValues, mode ports.Mode) sq.StatementBuilderType {
+	if len(searchTerms) == 0 {
+		return builder
+	}
+	var allFieldConditions []sq.Sqlizer
+	for field, values := range searchTerms {
+		metadata, ok := columnMetadata[field]
+		if !ok || !metadata.IsFuzzy {
+			continue
+		}
+		var fieldConditions []sq.Sqlizer
+		for _, val := range values.Values {
+			likeTerm := "%" + val + "%"
+			fieldConditions = append(fieldConditions, sq.ILike{field: likeTerm})
+		}
+		if len(fieldConditions) > 0 {
+			allFieldConditions = append(allFieldConditions, sq.Or(fieldConditions))
+		}
+	}
+	if len(allFieldConditions) > 0 {
+		if mode == ports.AND {
+			builder = builder.Where(sq.And(allFieldConditions))
+		} else {
+			builder = builder.Where(sq.Or(allFieldConditions))
+		}
+	}
 	return builder
 }
 
@@ -321,11 +374,12 @@ func validateOrdering(ordering *string) (string, string) {
 
 	if ordering != nil {
 		derefedOrdering := strings.ToLower(*ordering)
-		if derefedOrdering[0] == '-' {
-			derefedOrdering = derefedOrdering[1:]
+		if strings.HasPrefix(derefedOrdering, "-") {
+			derefedOrdering = strings.TrimPrefix(derefedOrdering, "-")
 			orderDir = "ASC"
 		}
-		if _, ok := allowedOrderings[derefedOrdering]; ok {
+		metadata, ok := columnMetadata[derefedOrdering]
+		if ok && metadata.IsOrderable {
 			validatedOrdering = derefedOrdering
 		}
 	}

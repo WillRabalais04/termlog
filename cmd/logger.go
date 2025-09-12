@@ -42,7 +42,7 @@ func main() {
 	entry := &domain.LogEntry{
 		Command:              *cmd,
 		ExitCode:             int32(*exit),
-		Timestamp:            *ts,
+		Timestamp:           *ts,
 		Shell_PID:            int32(*spid),
 		ShellUptime:          *uptime,
 		WorkingDirectory:     *cwd,
