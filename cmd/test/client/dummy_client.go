@@ -48,7 +48,7 @@ func main() {
 			Hostname:             "a",
 			SSHClient:            "b",
 			TTY:                  "tty01",
-			IsGitRepo:            false,
+			GitRepo:            false,
 			GitRepoRoot:          "asdf",
 			GitBranch:            "main",
 			GitCommit:            "2342aga",

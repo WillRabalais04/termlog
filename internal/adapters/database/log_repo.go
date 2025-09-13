@@ -44,7 +44,7 @@ var columnMetadata = map[string]struct {
 	"hostname":            {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
 	"ssh_client":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
 	"tty":                 {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
-	"is_git_repo":         {Type: false, IsOrderable: true, IsExact: true, IsFuzzy: false},
+	"git_repo":            {Type: false, IsOrderable: true, IsExact: true, IsFuzzy: false},
 	"git_repo_root":       {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
 	"git_branch":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
 	"git_commit":          {Type: "", IsOrderable: true, IsExact: true, IsFuzzy: true},
@@ -157,7 +157,7 @@ func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 			entry.Hostname,
 			entry.SSHClient,
 			entry.TTY,
-			entry.IsGitRepo,
+			entry.GitRepo,
 			entry.GitRepoRoot,
 			entry.GitBranch,
 			entry.GitCommit,
@@ -176,16 +176,17 @@ func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 
 // switch to calling list and with a filter that has event_id=id, user access and limit = 1 (if faster)
 func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
-	filter := &ports.LogFilter{
-		FilterTerms: map[string]ports.FilterValues{
-			"event_id": {Values: []string{id}},
-		},
-		FilterMode: ports.AND,
-	}
+	filter := ports.NewFilterBuilder().
+		AddFilterTerm("event_id", id).
+		Build()
 
 	entries, err := r.List(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute get query: %w", err)
+	}
+
+	if len(entries) != 1 {
+		return nil, fmt.Errorf("failed to get entry")
 	}
 
 	return entries[0], nil
@@ -233,30 +234,48 @@ func (r *LogRepo) List(ctx context.Context, filter *ports.LogFilter) ([]*domain.
 	return entries, nil
 }
 
-func (r *LogRepo) Delete(ctx context.Context, id string) error {
-	filter := &ports.LogFilter{
-		FilterTerms: map[string]ports.FilterValues{
-			"event_id": {Values: []string{id}},
-		},
-		FilterMode: ports.AND,
+func (r *LogRepo) Delete(ctx context.Context, id string) (*domain.LogEntry, error) {
+	filter := ports.NewFilterBuilder().
+		AddFilterTerm("event_id", id).
+		Build()
+	deletedEntries, err := r.DeleteMultiple(ctx, filter)
+
+	if len(deletedEntries) != 1 || err != nil {
+		return nil, fmt.Errorf("failed to get deleted entry: %v", err)
 	}
-	return r.DeleteMultiple(ctx, filter)
+	return deletedEntries[0], nil
 }
 
-func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *ports.LogFilter) error {
+func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *ports.LogFilter) ([]*domain.LogEntry, error) {
 	query := sq.StatementBuilderType(r.sb.Delete("logs"))
-	query = applyFilterTerms(query, filter.FilterTerms, filter.FilterMode) // use applyfilters maybe?
+	query = applyFilters(query, filter)
 
-	sqlStr, args, err := (sq.DeleteBuilder(query)).ToSql()
+	sqlStr, args, err := (sq.DeleteBuilder(query)).Suffix("RETURNING " + strings.Join(logColumns, ", ")).ToSql()
 	if err != nil {
-		return fmt.Errorf("failed to build delete query: %w", err)
+		return nil, fmt.Errorf("failed to build delete query: %w", err)
 	}
 
-	_, err = r.db.ExecContext(ctx, sqlStr, args...)
+	rows, err := r.db.QueryContext(ctx, sqlStr, args...)
 	if err != nil {
-		return fmt.Errorf("failed to execute delete query: %w", err)
+		return nil, fmt.Errorf("failed to execute delete query: %w", err)
 	}
-	return nil
+	defer rows.Close()
+
+	var deletedEntries []*domain.LogEntry
+	for rows.Next() {
+		entry, err := scanLogEntry(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan log entry: %w", err)
+		}
+		deletedEntries = append(deletedEntries, entry)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error during rows iteration: %w", err)
+	}
+
+	return deletedEntries, nil
+
 }
 
 func applyFilters(builder sq.StatementBuilderType, filter *ports.LogFilter) sq.StatementBuilderType {
@@ -286,7 +305,7 @@ func applyFilterTerms(builder sq.StatementBuilderType, filterTerms map[string]po
 		for _, val := range values.Values {
 			typedValue, err := convertValue(val, metadata.Type)
 			if err != nil {
-				fmt.Printf("Error converting value for field '%s': %v\n", field, err)
+				fmt.Printf("error converting value for field '%s': %v\n", field, err)
 				continue
 			}
 			fieldConditions = append(fieldConditions, sq.Eq{field: typedValue})
@@ -353,7 +372,7 @@ func scanLogEntry(scanner interface {
 		&entry.Hostname,
 		&entry.SSHClient,
 		&entry.TTY,
-		&entry.IsGitRepo,
+		&entry.GitRepo,
 		&entry.GitRepoRoot,
 		&entry.GitBranch,
 		&entry.GitCommit,

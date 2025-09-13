@@ -26,10 +26,9 @@ func (s *LogService) List(ctx context.Context, filters *ports.LogFilter) ([]*dom
 	return s.repo.List(ctx, filters)
 }
 
-func (s *LogService) Delete(ctx context.Context, id string) error {
+func (s *LogService) Delete(ctx context.Context, id string) (*domain.LogEntry, error) {
 	return s.repo.Delete(ctx, id)
-
 }
-func (s *LogService) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) error {
+func (s *LogService) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
 	return s.repo.DeleteMultiple(ctx, filters)
 }

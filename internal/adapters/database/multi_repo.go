@@ -47,7 +47,7 @@ func (r *MultiRepo) flushCache(ctx context.Context) error {
 		if err := r.remote.Log(ctx, e); err != nil {
 			return fmt.Errorf("failed to push cached entry %s: %w", e.EventID, err)
 		}
-		if err := r.cache.Delete(ctx, e.EventID); err != nil {
+		if _, err := r.cache.Delete(ctx, e.EventID); err != nil {
 			return fmt.Errorf("failed to delete cached entry %s: %w", e.EventID, err)
 		}
 	}
@@ -70,18 +70,26 @@ func (r *MultiRepo) List(ctx context.Context, filters *ports.LogFilter) ([]*doma
 	return entries, nil
 }
 
-func (r *MultiRepo) Delete(ctx context.Context, id string) error {
-	err := r.remote.Delete(ctx, id)
-	if err != nil {
-		return r.cache.Delete(ctx, id)
+func (r *MultiRepo) Delete(ctx context.Context, id string) (*domain.LogEntry, error) {
+	deleted, err1 := r.remote.Delete(ctx, id)
+	if err1 != nil {
+		deleted, err2 := r.cache.Delete(ctx, id)
+		if err2 != nil {
+			return nil, fmt.Errorf("could not access local db: %v", err2)
+		}
+		return deleted, nil
 	}
-	return nil
+	return deleted, nil
 }
 
-func (r *MultiRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) error {
-	err := r.remote.DeleteMultiple(ctx, filters)
-	if err != nil {
-		return r.cache.DeleteMultiple(ctx, filters)
+func (r *MultiRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
+	deleted, err1 := r.remote.DeleteMultiple(ctx, filters)
+	if err1 != nil {
+		deleted, err2 := r.cache.DeleteMultiple(ctx, filters)
+		if err2 != nil {
+			return nil, fmt.Errorf("delete multiple failed: could not access local or remote db: %v %v", err1, err2)
+		}
+		return deleted, nil
 	}
-	return nil
+	return deleted, nil
 }

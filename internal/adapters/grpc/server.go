@@ -51,22 +51,22 @@ func (a *Adapter) List(ctx context.Context, req *pb.ListLogsRequest) (*pb.ListLo
 }
 
 func (a *Adapter) Delete(ctx context.Context, req *pb.DeleteLogRequest) (*pb.DeleteLogResponse, error) {
-	err := a.api.Delete(ctx, req.GetEventId())
+	deleted, err := a.api.Delete(ctx, req.GetEventId())
 	if err != nil {
 		return nil, err
 	}
-	return &pb.DeleteLogResponse{Success: true}, nil
+	return &pb.DeleteLogResponse{Success: true, Deleted: logEntryToProto(deleted)}, nil
 }
 
 func (a *Adapter) DeleteMultipleLogs(ctx context.Context, req *pb.DeleteMultipleLogsRequest) (*pb.DeleteMultipleLogsResponse, error) {
 	filters := filterFromProto(req.Filter)
 
-	err := a.api.DeleteMultiple(ctx, filters)
+	deleted, err := a.api.DeleteMultiple(ctx, filters)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.DeleteMultipleLogsResponse{Success: true, DeletedCount: 0}, nil
+	return &pb.DeleteMultipleLogsResponse{Success: true, Deleted: logEntriesToProto(deleted)}, nil
 }
 
 func logEntryToProto(entry *domain.LogEntry) *pb.LogEntry {
@@ -85,13 +85,22 @@ func logEntryToProto(entry *domain.LogEntry) *pb.LogEntry {
 		Hostname:             entry.Hostname,
 		SSHClient:            entry.SSHClient,
 		TTY:                  entry.TTY,
-		IsGitRepo:            entry.IsGitRepo,
+		GitRepo:            entry.GitRepo,
 		GitRepoRoot:          entry.GitRepoRoot,
 		GitBranch:            entry.GitBranch,
 		GitCommit:            entry.GitCommit,
 		GitStatus:            entry.GitStatus,
 		LoggedSuccessfully:   entry.LoggedSuccessfully,
 	}
+}
+
+func logEntriesToProto(entries []*domain.LogEntry) []*pb.LogEntry {
+	out := make([]*pb.LogEntry, 0, len(entries))
+
+	for _, entry := range entries {
+		out = append(out, logEntryToProto(entry))
+	}
+	return out
 }
 
 func logEntryFromProto(entry *pb.LogEntry) *domain.LogEntry {
@@ -110,7 +119,7 @@ func logEntryFromProto(entry *pb.LogEntry) *domain.LogEntry {
 		Hostname:             entry.Hostname,
 		SSHClient:            entry.SSHClient,
 		TTY:                  entry.TTY,
-		IsGitRepo:            entry.IsGitRepo,
+		GitRepo:            entry.GitRepo,
 		GitRepoRoot:          entry.GitRepoRoot,
 		GitBranch:            entry.GitBranch,
 		GitCommit:            entry.GitCommit,
@@ -118,6 +127,15 @@ func logEntryFromProto(entry *pb.LogEntry) *domain.LogEntry {
 		LoggedSuccessfully:   entry.LoggedSuccessfully,
 	}
 }
+
+// func logEntriesFromProto(entries []*pb.LogEntry) []*domain.LogEntry {
+// 	out := make([]*domain.LogEntry, 0, len(entries))
+
+// 	for _, entry := range entries {
+// 		out = append(out, logEntryFromProto(entry))
+// 	}
+// 	return out
+// }
 
 func filterFromProto(filter *pb.LogFilter) *ports.LogFilter {
 	if filter == nil {

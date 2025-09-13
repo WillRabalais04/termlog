@@ -44,9 +44,9 @@ _termlogger_hook() {
         termlogger_args+=(--ssh "$SSH_CLIENT")
       fi
 
-      local is_git_repo="false"
+      local it_repo="false"
       if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        is_git_repo="true"
+        git_repo="true"
         termlogger_args+=(--gitrepo ) 
         termlogger_args+=(--gitroot "$(git rev-parse --show-toplevel 2>/dev/null)")
         termlogger_args+=(--gitbranch "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)")

@@ -53,7 +53,7 @@ func main() {
 		Hostname:             *hostname,
 		SSHClient:            *sshClient,
 		TTY:                  *tty,
-		IsGitRepo:            *isRepo,
+		GitRepo:            *isRepo,
 		GitRepoRoot:          *gitRoot,
 		GitBranch:            *gitBranch,
 		GitCommit:            *gitCommit,

@@ -21,7 +21,7 @@ message LogEntry {
   string hostname = 12;
   string SSH_client = 13;
   string TTY = 14;
-  bool is_git_repo = 15;
+  bool git_repo = 15;
   string git_repo_root = 16;
   string git_branch = 17;
   string git_commit = 18;
@@ -88,6 +88,7 @@ message DeleteLogRequest {
 
 message DeleteLogResponse {
   bool success = 1;
+  LogEntry deleted = 2;
 }
 
 message DeleteMultipleLogsRequest {
@@ -95,7 +96,7 @@ message DeleteMultipleLogsRequest {
 }
 message DeleteMultipleLogsResponse {
   bool success = 1;
-  int64 deleted_count = 2;
+  repeated LogEntry deleted = 2;
 }
 
 service LogService {

@@ -19,7 +19,7 @@ type LogEntry struct {
 	Hostname             string
 	SSHClient            string
 	TTY                  string
-	IsGitRepo            bool
+	GitRepo            bool
 	GitRepoRoot          string
 	GitBranch            string
 	GitCommit            string
@@ -43,7 +43,7 @@ func PrintLogEntry(entry *LogEntry) {
 	fmt.Printf("Term:		%s\n", entry.Term)
 	fmt.Printf("Hostname:		%s\n", entry.Hostname)
 	fmt.Printf("TTY:		%s\n", entry.TTY)
-	fmt.Printf("IsGitRepo:		%t\n", entry.IsGitRepo)
+	fmt.Printf("GitRepo:		%t\n", entry.GitRepo)
 	fmt.Printf("GitRepoRoot:		%s\n", entry.GitRepoRoot)
 	fmt.Printf("GitBranch:		%s\n", entry.GitBranch)
 	fmt.Printf("GitCommit:		%s\n", entry.GitCommit)

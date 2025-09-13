@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/cmd/utils"
@@ -14,66 +16,154 @@ import (
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 	"github.com/WillRabalais04/terminalLog/internal/core/ports"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
-func testLog(ctx context.Context, svc service.LogService) {
-	entry := &domain.LogEntry{
-		Command:              "aaa",
-		ExitCode:             0,
-		Timestamp:            458198549889,
-		Shell_PID:            458198549,
-		ShellUptime:          458198549889,
-		WorkingDirectory:     "user/main",
-		PrevWorkingDirectory: "user",
-		User:                 "aaa",
-		EUID:                 234,
-		Term:                 "moew",
-		Hostname:             "n/a",
-		SSHClient:            "aaa",
-		TTY:                  "asdf",
-		IsGitRepo:            false,
-		GitRepoRoot:          "0000",
-		GitBranch:            "gfeat",
-		GitCommit:            "sga",
-		GitStatus:            "aa",
-		LoggedSuccessfully:   true,
+/*
+for reference:
+var logColumns = []string{
+	"event_id", "command", "exit_code", "ts", "shell_pid", "shell_uptime", "cwd",
+	"prev_cwd", "user_name", "euid", "term", "hostname", "ssh_client",
+	"tty", "git_repo", "git_repo_root", "git_branch", "git_commit",
+	"git_status", "logged_successfully",
+}
+*/
+
+func randomLog() *domain.LogEntry {
+	return &domain.LogEntry{
+		EventID:   uuid.New().String(),
+		Command:   fmt.Sprintf("cmd-%d", rand.Intn(100)),
+		ExitCode:  rand.Int31n(10),
+		Timestamp: time.Now().UnixNano(),
+		Shell_PID: int32(rand.Intn(5000)),
+		// ShellUptime:          rand.Int63n(1000000),
+		WorkingDirectory: fmt.Sprintf("/tmp/dir-%d", rand.Intn(5)),
+		// PrevWorkingDirectory: "/" + uuid.New().String()[:8],
+		User: "user" + uuid.New().String()[:8],
+		EUID: int32(rand.Intn(1000)),
+		// Term:                 uuid.New().String()[:8],
+		// Hostname:             uuid.New().String()[:8],
+		// SSHClient:            "",
+		// TTY:                  fmt.Sprintf("pts/%d", rand.Intn(10)),
+		GitRepo: rand.Intn(2) == 0,
+		// GitRepoRoot:          "/" + uuid.New().String()[:8],
+		// GitBranch:            uuid.New().String()[:8],
+		// GitCommit:            uuid.New().String()[:8],
+		// GitStatus:            "clean",
+		// LoggedSuccessfully:   true,
 	}
-	err := svc.Log(ctx, entry)
-	prettyPrint("log", []*domain.LogEntry{entry}, err)
 }
 
-func testGet(ctx context.Context, svc service.LogService) {
-	entry, err := svc.Get(ctx, "a68037cc-7293-4a03-a264-edc5ff05ba58")
+func testLog(ctx context.Context, svc service.LogService, n int) []*domain.LogEntry {
+	var entries []*domain.LogEntry
+
+	entries = append(entries, &domain.LogEntry{
+		Command:            "pwd",
+		ExitCode:           0,
+		Timestamp:          time.Now().UnixNano(),
+		WorkingDirectory:   "/home/test",
+		User:               "tester",
+		Hostname:           "knownhost",
+		LoggedSuccessfully: true,
+	})
+
+	entries = append(entries, &domain.LogEntry{
+		Command:            "ls",
+		ExitCode:           1,
+		Timestamp:          time.Now().UnixNano(),
+		User:               "deleteme",
+		Hostname:           "host",
+		LoggedSuccessfully: true,
+	})
+
+	entries = append(entries, &domain.LogEntry{
+		Command:            "git status",
+		ExitCode:           0,
+		Timestamp:          time.Now().UnixNano(),
+		User:               "gituser",
+		GitRepo:            true,
+		GitRepoRoot:        "/repo",
+		GitBranch:          "feature/test",
+		GitCommit:          "abca",
+		GitStatus:          "dirty",
+		LoggedSuccessfully: true,
+	})
+
+	for range n - 3 {
+		entries = append(entries, randomLog())
+	}
+
+	for _, entry := range entries {
+		if err := svc.Log(ctx, entry); err != nil {
+			fmt.Printf("failed to log entry %v: %v\n", entry.Command, err)
+		}
+	}
+
+	prettyPrint("log", entries, nil)
+	return entries
+}
+
+func testGet(ctx context.Context, svc service.LogService) { // can't make working test without getting logs first
+	filter := ports.NewFilterBuilder().
+		AddSearchTerm("command", "pwd").
+		Build()
+	entries, err := svc.List(ctx, filter)
+	if err != nil {
+		log.Fatalf("couldn't get pwd dummy command: %v", err)
+	}
+	entry, err := svc.Get(ctx, entries[0].EventID)
 	prettyPrint("get", []*domain.LogEntry{entry}, err)
 }
 
 func testList(ctx context.Context, svc service.LogService) {
-	entries, err := svc.List(ctx, &ports.LogFilter{})
-	prettyPrint("list", entries, err)
+	filter1 := ports.NewFilterBuilder().
+		AddFilterTerm("exit_code", "0").
+		Build()
+	entries1, err := svc.List(ctx, filter1)
+	prettyPrint("list 1", entries1, err)
+
+	filter2 := ports.NewFilterBuilder().
+		AddSearchTerm("command", "git status").
+		Build()
+	entries2, err := svc.List(ctx, filter2)
+	prettyPrint("list 2", entries2, err)
 }
 
 func testDelete(ctx context.Context, svc service.LogService) {
-	err := svc.Delete(ctx, "a68037cc-7293-4a03-a264-edc5ff05ba58")
-	prettyPrint("delete", nil, err)
+	filter := ports.NewFilterBuilder().
+		AddSearchTerm("command", "pwd").
+		Build()
+	entries, err := svc.List(ctx, filter)
+	if err != nil {
+		log.Fatalf("couldn't get pwd dummy command: %v", err)
+	}
+	deleted, err := svc.Delete(ctx, entries[0].EventID)
+	prettyPrint("delete", []*domain.LogEntry{deleted}, err)
 }
 
 func testDeleteMultiple(ctx context.Context, svc service.LogService) {
-	filter := &ports.LogFilter{
-		FilterTerms: map[string]ports.FilterValues{
-			"git_repo": {Values: []string{"true"}},
-		},
-		FilterMode: ports.AND,
-	}
-	err := svc.DeleteMultiple(ctx, filter)
+
+	filter := ports.NewFilterBuilder().
+		AddFilterTerm("git_repo", "true").
+		Build()
+
+	deleted, err := svc.DeleteMultiple(ctx, filter)
 	if err != nil {
 		log.Printf("testDeleteMultiple failed: %v", err)
 	}
-	prettyPrint("delete multiple", nil, err)
+	prettyPrint("delete multiple", deleted, err)
 }
 
 func prettyPrint(testName string, entries []*domain.LogEntry, err error) {
-	fmt.Printf("---------------Test: %s---------------\n", testName)
+	width := 80
+	label := fmt.Sprintf(" Test: %s ", testName)
+
+	left := (width - len(label)) / 2
+	right := width - len(label) - left
+
+	fmt.Printf("%s%s%s\n", strings.Repeat("-", left), label, strings.Repeat("-", right))
+
 	if err != nil {
 		fmt.Printf("%v\n", err)
 	} else {
@@ -81,11 +171,8 @@ func prettyPrint(testName string, entries []*domain.LogEntry, err error) {
 			domain.PrintLogEntry(e)
 		}
 	}
-	spacing := make([]byte, len(testName))
-	for range len(testName) + 6 {
-		spacing = append(spacing, '-')
-	}
-	fmt.Printf("---------------%s---------------\n", spacing)
+
+	fmt.Println(strings.Repeat("-", width))
 }
 
 func loadEnv() {
@@ -134,12 +221,12 @@ func getMultiRepo() *database.MultiRepo {
 func main() {
 	loadEnv()
 
-	testSVC := service.NewLogService(getLocalRepo())
+	testSVC := service.NewLogService(getRemoteRepo())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	testLog(ctx, *testSVC)
+	testLog(ctx, *testSVC, 6)
 	testList(ctx, *testSVC)
 	testGet(ctx, *testSVC)
 	testDelete(ctx, *testSVC)
