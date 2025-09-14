@@ -11,6 +11,7 @@ import (
 	"github.com/WillRabalais04/terminalLog/cmd/utils"
 	"github.com/WillRabalais04/terminalLog/db"
 	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
+	grpcutils "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
 	"github.com/joho/godotenv"
@@ -36,13 +37,14 @@ func main() {
 	gitBranch := flag.String("gitbranch", "", "Git branch")
 	gitCommit := flag.String("gitcommit", "", "Git commit hash")
 	gitStatus := flag.String("gitstatus", "", "Git status")
+	jsonMode := flag.Bool("json", false, "Log output to a JSON file in addition to the database.")
 
 	flag.Parse()
 
 	entry := &domain.LogEntry{
 		Command:              *cmd,
 		ExitCode:             int32(*exit),
-		Timestamp:           *ts,
+		Timestamp:            *ts,
 		Shell_PID:            int32(*spid),
 		ShellUptime:          *uptime,
 		WorkingDirectory:     *cwd,
@@ -53,7 +55,7 @@ func main() {
 		Hostname:             *hostname,
 		SSHClient:            *sshClient,
 		TTY:                  *tty,
-		GitRepo:            *isRepo,
+		GitRepo:              *isRepo,
 		GitRepoRoot:          *gitRoot,
 		GitBranch:            *gitBranch,
 		GitCommit:            *gitCommit,
@@ -108,7 +110,7 @@ func main() {
 	defer cancel()
 
 	svc.Log(ctx, entry)
-
-	// test by logging json files in this directory
-	// LogJSON(entry, getProjectRoot(homeDir))
+	if *jsonMode {
+		utils.LogJSON(grpcutils.LogEntryToProto(entry), utils.GetProjectRoot(homeDir)) // casting to proto for funsies
+	}
 }

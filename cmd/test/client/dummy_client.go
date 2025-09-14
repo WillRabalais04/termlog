@@ -1,4 +1,4 @@
-package client_test
+package test
 
 import (
 	"bufio"
@@ -48,7 +48,7 @@ func main() {
 			Hostname:             "a",
 			SSHClient:            "b",
 			TTY:                  "tty01",
-			GitRepo:            false,
+			GitRepo:              false,
 			GitRepoRoot:          "asdf",
 			GitBranch:            "main",
 			GitCommit:            "2342aga",

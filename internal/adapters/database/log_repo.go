@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
-	"github.com/WillRabalais04/terminalLog/internal/core/ports"
 	"github.com/google/uuid"
 
 	sq "github.com/Masterminds/squirrel"
@@ -176,7 +175,7 @@ func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 
 // switch to calling list and with a filter that has event_id=id, user access and limit = 1 (if faster)
 func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
-	filter := ports.NewFilterBuilder().
+	filter := domain.NewFilterBuilder().
 		AddFilterTerm("event_id", id).
 		Build()
 
@@ -192,7 +191,7 @@ func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) 
 	return entries[0], nil
 }
 
-func (r *LogRepo) List(ctx context.Context, filter *ports.LogFilter) ([]*domain.LogEntry, error) {
+func (r *LogRepo) List(ctx context.Context, filter *domain.LogFilter) ([]*domain.LogEntry, error) {
 	query := sq.StatementBuilderType(r.sb.Select(logColumns...).From("logs"))
 	query = applyFilters(query, filter)
 	selectQuery := sq.SelectBuilder(query)
@@ -235,7 +234,7 @@ func (r *LogRepo) List(ctx context.Context, filter *ports.LogFilter) ([]*domain.
 }
 
 func (r *LogRepo) Delete(ctx context.Context, id string) (*domain.LogEntry, error) {
-	filter := ports.NewFilterBuilder().
+	filter := domain.NewFilterBuilder().
 		AddFilterTerm("event_id", id).
 		Build()
 	deletedEntries, err := r.DeleteMultiple(ctx, filter)
@@ -246,7 +245,7 @@ func (r *LogRepo) Delete(ctx context.Context, id string) (*domain.LogEntry, erro
 	return deletedEntries[0], nil
 }
 
-func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *ports.LogFilter) ([]*domain.LogEntry, error) {
+func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *domain.LogFilter) ([]*domain.LogEntry, error) {
 	query := sq.StatementBuilderType(r.sb.Delete("logs"))
 	query = applyFilters(query, filter)
 
@@ -278,7 +277,7 @@ func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *ports.LogFilter) (
 
 }
 
-func applyFilters(builder sq.StatementBuilderType, filter *ports.LogFilter) sq.StatementBuilderType {
+func applyFilters(builder sq.StatementBuilderType, filter *domain.LogFilter) sq.StatementBuilderType {
 	builder = applyFilterTerms(builder, filter.FilterTerms, filter.FilterMode)
 	builder = applySearchTerms(builder, filter.SearchTerms, filter.SearchMode)
 	// add user permissions filter later
@@ -291,7 +290,7 @@ func applyFilters(builder sq.StatementBuilderType, filter *ports.LogFilter) sq.S
 	return builder
 }
 
-func applyFilterTerms(builder sq.StatementBuilderType, filterTerms map[string]ports.FilterValues, mode ports.Mode) sq.StatementBuilderType {
+func applyFilterTerms(builder sq.StatementBuilderType, filterTerms map[string]domain.FilterValues, mode domain.Mode) sq.StatementBuilderType {
 	if len(filterTerms) == 0 {
 		return builder
 	}
@@ -315,7 +314,7 @@ func applyFilterTerms(builder sq.StatementBuilderType, filterTerms map[string]po
 		}
 	}
 	if len(allFieldConditions) > 0 {
-		if mode == ports.AND {
+		if mode == domain.AND {
 			builder = builder.Where(sq.And(allFieldConditions))
 		} else {
 			builder = builder.Where(sq.Or(allFieldConditions))
@@ -324,7 +323,7 @@ func applyFilterTerms(builder sq.StatementBuilderType, filterTerms map[string]po
 	return builder
 }
 
-func applySearchTerms(builder sq.StatementBuilderType, searchTerms map[string]ports.SearchValues, mode ports.Mode) sq.StatementBuilderType {
+func applySearchTerms(builder sq.StatementBuilderType, searchTerms map[string]domain.SearchValues, mode domain.Mode) sq.StatementBuilderType {
 	if len(searchTerms) == 0 {
 		return builder
 	}
@@ -337,14 +336,15 @@ func applySearchTerms(builder sq.StatementBuilderType, searchTerms map[string]po
 		var fieldConditions []sq.Sqlizer
 		for _, val := range values.Values {
 			likeTerm := "%" + val + "%"
-			fieldConditions = append(fieldConditions, sq.ILike{field: likeTerm})
+			condition := sq.Expr("LOWER("+field+") LIKE LOWER(?)", likeTerm) // lower case index for faster fuzzy search (also sqlite doesn't support ILIKE)
+			fieldConditions = append(fieldConditions, condition)
 		}
 		if len(fieldConditions) > 0 {
 			allFieldConditions = append(allFieldConditions, sq.Or(fieldConditions))
 		}
 	}
 	if len(allFieldConditions) > 0 {
-		if mode == ports.AND {
+		if mode == domain.AND {
 			builder = builder.Where(sq.And(allFieldConditions))
 		} else {
 			builder = builder.Where(sq.Or(allFieldConditions))

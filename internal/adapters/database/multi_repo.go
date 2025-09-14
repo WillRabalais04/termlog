@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
-	"github.com/WillRabalais04/terminalLog/internal/core/ports"
 )
 
 type MultiRepo struct {
@@ -34,7 +33,7 @@ func (r *MultiRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
 }
 
 func (r *MultiRepo) flushCache(ctx context.Context) error {
-	entries, err := r.cache.List(ctx, &ports.LogFilter{}) // empty filter should return all
+	entries, err := r.cache.List(ctx, &domain.LogFilter{}) // empty filter should return all
 
 	if err != nil {
 		return fmt.Errorf("reading cache failed: %w", err)
@@ -62,7 +61,7 @@ func (r *MultiRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error
 	return entry, nil
 }
 
-func (r *MultiRepo) List(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
+func (r *MultiRepo) List(ctx context.Context, filters *domain.LogFilter) ([]*domain.LogEntry, error) {
 	entries, err := r.remote.List(ctx, filters)
 	if err != nil {
 		return r.cache.List(ctx, filters)
@@ -82,7 +81,7 @@ func (r *MultiRepo) Delete(ctx context.Context, id string) (*domain.LogEntry, er
 	return deleted, nil
 }
 
-func (r *MultiRepo) DeleteMultiple(ctx context.Context, filters *ports.LogFilter) ([]*domain.LogEntry, error) {
+func (r *MultiRepo) DeleteMultiple(ctx context.Context, filters *domain.LogFilter) ([]*domain.LogEntry, error) {
 	deleted, err1 := r.remote.DeleteMultiple(ctx, filters)
 	if err1 != nil {
 		deleted, err2 := r.cache.DeleteMultiple(ctx, filters)

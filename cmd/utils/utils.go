@@ -9,8 +9,64 @@ import (
 	"strings"
 
 	pb "github.com/WillRabalais04/terminalLog/api/gen"
+	"github.com/WillRabalais04/terminalLog/db"
+	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
+	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 	"google.golang.org/protobuf/encoding/protojson"
 )
+
+func GetLocalRepo(test bool) *database.LogRepo {
+	var cachePath string
+	if test {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("could not get home dir: %v", err)
+		}
+		cachePath = filepath.Join(GetProjectRoot(homeDir), "cmd", "test", "logs", "cache.db")
+	}
+
+	cache, err := database.NewRepo(&database.Config{
+		Driver:       "sqlite3",
+		DataSource:   cachePath,
+		SchemaString: db.SqliteSchema,
+	})
+	if err != nil {
+		log.Printf("could not init cache repo (sqlite): %v", err)
+		os.Exit(1)
+	}
+	return cache
+}
+
+func GetRemoteRepo(test bool) *database.LogRepo {
+	var dataSource string
+	if test {
+		dataSource = GetTestDSN()
+	} else {
+		dataSource = GetDSN()
+	}
+	remote, err := database.NewRepo(&database.Config{
+		Driver:       "pgx",
+		DataSource:   dataSource,
+		SchemaString: db.PostgresSchema,
+	})
+	if err != nil {
+		log.Fatalf("could not init remote repo (postgres): %v", err)
+	}
+	return remote
+}
+func GetMultiRepo(test bool) *database.MultiRepo {
+	return database.NewMultiRepo(GetLocalRepo(test), GetRemoteRepo(test))
+}
+
+// func LoadEnv() {
+// 	homeDir, err := os.UserHomeDir()
+// 	if err != nil {
+// 		log.Fatalf("failed to get home directory: %v", err)
+// 	}
+// 	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
+// 		log.Println("no .env found, using system env vars")
+// 	}
+// }
 
 func GetDSN() string {
 	host := GetEnvOrDefault("DB_HOST", "localhost")
@@ -27,7 +83,7 @@ func GetDSN() string {
 }
 
 func GetTestDSN() string {
-	host := GetEnvOrDefault("TESTDB_HOST", "localhost")
+	host := GetEnvOrDefault("TEST_DB_HOST", "localhost")
 	port := GetEnvOrDefault("TEST_DB_PORT", "5434")
 	user := GetEnvOrDefault("TEST_DB_USER", "test")
 	password := GetEnvOrDefault("TEST_DB_PASSWORD", "test")
@@ -113,4 +169,29 @@ func GetProjectRoot(homeDir string) string {
 		log.Fatalf("failed to read project root config: %v", err)
 	}
 	return strings.TrimSpace(string(projectRootBytes))
+}
+
+func PrintLogEntry(entry *domain.LogEntry) {
+
+	fmt.Printf("LogEntry: {\n")
+	fmt.Printf("EventID:		%s\n", entry.EventID)
+	fmt.Printf("Command:		%s\n", entry.Command)
+	fmt.Printf("ExitCode:		%d\n", entry.ExitCode)
+	fmt.Printf("Timestamp:		%d\n", entry.Timestamp)
+	fmt.Printf("Shell_PID:		%d\n", entry.Shell_PID)
+	fmt.Printf("ShellUptime:	%d\n", entry.ShellUptime)
+	fmt.Printf("WorkingDirectory:		%s\n", entry.WorkingDirectory)
+	fmt.Printf("PrevWorkingDirectory:		%s\n", entry.PrevWorkingDirectory)
+	fmt.Printf("User:		%s\n", entry.User)
+	fmt.Printf("EUID:		%d\n", entry.EUID)
+	fmt.Printf("Term:		%s\n", entry.Term)
+	fmt.Printf("Hostname:		%s\n", entry.Hostname)
+	fmt.Printf("TTY:		%s\n", entry.TTY)
+	fmt.Printf("GitRepo:		%t\n", entry.GitRepo)
+	fmt.Printf("GitRepoRoot:		%s\n", entry.GitRepoRoot)
+	fmt.Printf("GitBranch:		%s\n", entry.GitBranch)
+	fmt.Printf("GitCommit:		%s\n", entry.GitCommit)
+	fmt.Printf("GitStatus:		%s\n", entry.GitStatus)
+	fmt.Printf("LoggedSuccessfully:		%t\n", entry.LoggedSuccessfully)
+	fmt.Println("}")
 }

@@ -5,19 +5,13 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/cmd/utils"
-	"github.com/WillRabalais04/terminalLog/db"
-	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
-	"github.com/WillRabalais04/terminalLog/internal/core/ports"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 )
 
 /*
@@ -105,7 +99,7 @@ func testLog(ctx context.Context, svc service.LogService, n int) []*domain.LogEn
 }
 
 func testGet(ctx context.Context, svc service.LogService) { // can't make working test without getting logs first
-	filter := ports.NewFilterBuilder().
+	filter := domain.NewFilterBuilder().
 		AddSearchTerm("command", "pwd").
 		Build()
 	entries, err := svc.List(ctx, filter)
@@ -117,13 +111,13 @@ func testGet(ctx context.Context, svc service.LogService) { // can't make workin
 }
 
 func testList(ctx context.Context, svc service.LogService) {
-	filter1 := ports.NewFilterBuilder().
+	filter1 := domain.NewFilterBuilder().
 		AddFilterTerm("exit_code", "0").
 		Build()
 	entries1, err := svc.List(ctx, filter1)
 	prettyPrint("list 1", entries1, err)
 
-	filter2 := ports.NewFilterBuilder().
+	filter2 := domain.NewFilterBuilder().
 		AddSearchTerm("command", "git status").
 		Build()
 	entries2, err := svc.List(ctx, filter2)
@@ -131,7 +125,7 @@ func testList(ctx context.Context, svc service.LogService) {
 }
 
 func testDelete(ctx context.Context, svc service.LogService) {
-	filter := ports.NewFilterBuilder().
+	filter := domain.NewFilterBuilder().
 		AddSearchTerm("command", "pwd").
 		Build()
 	entries, err := svc.List(ctx, filter)
@@ -144,7 +138,7 @@ func testDelete(ctx context.Context, svc service.LogService) {
 
 func testDeleteMultiple(ctx context.Context, svc service.LogService) {
 
-	filter := ports.NewFilterBuilder().
+	filter := domain.NewFilterBuilder().
 		AddFilterTerm("git_repo", "true").
 		Build()
 
@@ -168,60 +162,16 @@ func prettyPrint(testName string, entries []*domain.LogEntry, err error) {
 		fmt.Printf("%v\n", err)
 	} else {
 		for _, e := range entries {
-			domain.PrintLogEntry(e)
+			utils.PrintLogEntry(e)
 		}
 	}
 
 	fmt.Println(strings.Repeat("-", width))
 }
 
-func loadEnv() {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("failed to get home directory: %v", err)
-	}
-	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
-		log.Println("no .env found, using system env vars")
-	}
-}
-func getLocalRepo() *database.LogRepo {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("could not get home dir: %v", err)
-	}
-	cachePath := filepath.Join(utils.GetProjectRoot(homeDir), "cmd", "test", "logs", "cache.db")
-	cache, err := database.NewRepo(&database.Config{
-		Driver:       "sqlite3",
-		DataSource:   cachePath,
-		SchemaString: db.SqliteSchema,
-	})
-	if err != nil {
-		log.Printf("could not init cache repo (sqlite): %v", err)
-		os.Exit(1)
-	}
-	return cache
-}
-
-func getRemoteRepo() *database.LogRepo {
-	remote, err := database.NewRepo(&database.Config{
-		Driver:       "pgx",
-		DataSource:   utils.GetTestDSN(),
-		SchemaString: db.PostgresSchema,
-	})
-	if err != nil {
-		log.Fatalf("could not init remote repo (postgres): %v", err)
-	}
-	return remote
-}
-func getMultiRepo() *database.MultiRepo {
-	multiRepo := database.NewMultiRepo(getLocalRepo(), getRemoteRepo())
-	return multiRepo
-}
-
 func main() {
-	loadEnv()
 
-	testSVC := service.NewLogService(getRemoteRepo())
+	testSVC := service.NewLogService(utils.GetLocalRepo(true))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

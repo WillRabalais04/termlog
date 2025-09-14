@@ -1,6 +1,46 @@
+
 ### >>> logger start >>>
+PAUSE_FILE="$HOME/.termlogger/.paused"
+JSON_FILE="$HOME/.termlogger/.json"
+
+log-pause() {
+  if [ -f "$PAUSE_FILE" ]; then
+    echo "⏸ Terminal logging is already PAUSED."
+  else
+    touch "$PAUSE_FILE"
+    echo "⏸ Terminal logging is now PAUSED."
+  fi
+}
+log-resume() {
+  if [ -f "$PAUSE_FILE" ]; then
+    rm -f "$PAUSE_FILE"
+    echo "▶️ Terminal logging is now RESUMED."
+  else
+    echo "▶️ Terminal logging is already IN PROGRESS."
+  fi
+}
+log-json-start() {
+  if [ -f "$JSON_FILE" ]; then
+    echo "📄 Logging terminal commands to json file is already IN PROGRESS."
+  else
+    touch "$JSON_FILE"
+    echo "📄 Logging terminal commands to json file."
+  fi
+}
+log-json-stop() {
+  if [ -f "$JSON_FILE" ]; then
+    rm -f "$JSON_FILE"
+    echo "📄 Logging terminal commands to json file now STOPPED."
+  else
+    echo "📄 Logging terminal commands to json file is already STOPPED."
+  fi
+}
+
 _termlogger_hook() {
-  
+    if [ -f "$PAUSE_FILE" ]; then
+        return
+    fi
+
     local exit_code=$?
     local last_command
 
@@ -16,8 +56,7 @@ _termlogger_hook() {
         last_command=$(history 1 2>/dev/null | sed 's/^[[:space:]]*[0-9]*[[:space:]]*//')
     fi
 
-    if [[ -n "$last_command" && "$last_command" != "_termlogger_hook"* ]]; then
-        
+    if [[ -n "$last_command" && "$last_command" != "_termlogger_hook"* && "$last_command" != "log-pause"* && "$last_command" != "log-resume"* && "$last_command" != "log-json-start"* && "$last_command" != "log-json-stop"* ]]; then        
         local ts="${EPOCHSECONDS:-$(date +%s)}"
         local hostname_val="${HOSTNAME:-$(hostname)}"
         local tty_val="${TTY:-$(tty 2>/dev/null)}"
@@ -42,6 +81,9 @@ _termlogger_hook() {
       fi
       if [[ -n "$SSH_CLIENT" ]]; then
         termlogger_args+=(--ssh "$SSH_CLIENT")
+      fi
+      if [ -f "$JSON_FILE" ]; then
+        termlogger_args+=(--json)
       fi
 
       local it_repo="false"

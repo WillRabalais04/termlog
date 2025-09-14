@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"fmt"
+	"time"
 )
 
 type LogEntry struct {
@@ -19,7 +19,7 @@ type LogEntry struct {
 	Hostname             string
 	SSHClient            string
 	TTY                  string
-	GitRepo            bool
+	GitRepo              bool
 	GitRepoRoot          string
 	GitBranch            string
 	GitCommit            string
@@ -27,27 +27,91 @@ type LogEntry struct {
 	LoggedSuccessfully   bool
 }
 
-func PrintLogEntry(entry *LogEntry) {
+type FilterValues struct {
+	Values []string
+}
 
-	fmt.Printf("LogEntry: {\n")
-	fmt.Printf("EventID:		%s\n", entry.EventID)
-	fmt.Printf("Command:		%s\n", entry.Command)
-	fmt.Printf("ExitCode:		%d\n", entry.ExitCode)
-	fmt.Printf("Timestamp:		%d\n", entry.Timestamp)
-	fmt.Printf("Shell_PID:		%d\n", entry.Shell_PID)
-	fmt.Printf("ShellUptime:	%d\n", entry.ShellUptime)
-	fmt.Printf("WorkingDirectory:		%s\n", entry.WorkingDirectory)
-	fmt.Printf("PrevWorkingDirectory:		%s\n", entry.PrevWorkingDirectory)
-	fmt.Printf("User:		%s\n", entry.User)
-	fmt.Printf("EUID:		%d\n", entry.EUID)
-	fmt.Printf("Term:		%s\n", entry.Term)
-	fmt.Printf("Hostname:		%s\n", entry.Hostname)
-	fmt.Printf("TTY:		%s\n", entry.TTY)
-	fmt.Printf("GitRepo:		%t\n", entry.GitRepo)
-	fmt.Printf("GitRepoRoot:		%s\n", entry.GitRepoRoot)
-	fmt.Printf("GitBranch:		%s\n", entry.GitBranch)
-	fmt.Printf("GitCommit:		%s\n", entry.GitCommit)
-	fmt.Printf("GitStatus:		%s\n", entry.GitStatus)
-	fmt.Printf("LoggedSuccessfully:		%t\n", entry.LoggedSuccessfully)
-	fmt.Println("}")
+type SearchValues struct {
+	Values []string
+}
+
+type Mode int
+
+const (
+	OR  Mode = 0
+	AND Mode = 1
+)
+
+type LogFilter struct {
+	FilterTerms map[string]FilterValues
+	FilterMode  Mode
+	SearchTerms map[string]SearchValues
+	SearchMode  Mode
+	Limit       uint64
+	Offset      uint64
+	OrderBy     *string
+	StartTime   *int64
+	EndTime     *int64
+}
+
+type FilterBuilder struct {
+	filter *LogFilter
+}
+
+func NewFilterBuilder() *FilterBuilder {
+	return &FilterBuilder{
+		filter: &LogFilter{
+			FilterTerms: make(map[string]FilterValues),
+			SearchTerms: make(map[string]SearchValues),
+			FilterMode:  OR,
+			SearchMode:  OR,
+		},
+	}
+}
+
+func (b *FilterBuilder) AddFilterTerm(key string, values ...string) *FilterBuilder {
+	b.filter.FilterTerms[key] = FilterValues{Values: values}
+	return b
+}
+
+func (b *FilterBuilder) AddSearchTerm(key string, values ...string) *FilterBuilder {
+	b.filter.SearchTerms[key] = SearchValues{Values: values}
+	return b
+}
+
+func (b *FilterBuilder) SetFilterMode(mode Mode) *FilterBuilder {
+	b.filter.FilterMode = mode
+	return b
+}
+
+func (b *FilterBuilder) SetSearchMode(mode Mode) *FilterBuilder {
+	b.filter.SearchMode = mode
+	return b
+}
+
+func (b *FilterBuilder) SetLimit(limit uint64) *FilterBuilder {
+	b.filter.Limit = limit
+	return b
+}
+
+func (b *FilterBuilder) SetOffset(offset uint64) *FilterBuilder {
+	b.filter.Offset = offset
+	return b
+}
+
+func (b *FilterBuilder) SetOrderBy(orderBy string) *FilterBuilder {
+	b.filter.OrderBy = &orderBy
+	return b
+}
+
+func (b *FilterBuilder) SetTimeRange(start, end time.Time) *FilterBuilder {
+	startTime := start.Unix()
+	endTime := end.Unix()
+	b.filter.StartTime = &startTime
+	b.filter.EndTime = &endTime
+	return b
+}
+
+func (b *FilterBuilder) Build() *LogFilter {
+	return b.filter
 }
