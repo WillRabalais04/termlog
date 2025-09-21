@@ -43,6 +43,9 @@ _termlogger_hook() {
 
     local exit_code=$?
     local last_command
+    local log_dir="$HOME/.termlogger"
+    local log_file="$log_dir/bin.log"
+    mkdir -p "$log_dir"
 
     # prevent infinite recursion
     if [[ "$_termlogger_running" == "1" ]]; then
@@ -95,8 +98,7 @@ _termlogger_hook() {
         termlogger_args+=(--gitcommit "$(git rev-parse --short HEAD 2>/dev/null)")
         termlogger_args+=(--gitstatus "$(git status --porcelain=v1 2>/dev/null)")
       fi
-
-      (/usr/local/bin/termlogger "${termlogger_args[@]}" &>/dev/null &)
+      ( /usr/local/bin/termlogger "${termlogger_args[@]}" &>> "$log_file" & )
     fi
     
     _termlogger_running=0

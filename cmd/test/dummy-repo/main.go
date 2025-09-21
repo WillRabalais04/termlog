@@ -4,50 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/cmd/utils"
+	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
 	"github.com/WillRabalais04/terminalLog/internal/core/service"
-	"github.com/google/uuid"
+	"github.com/WillRabalais04/terminalLog/internal/testutils"
 )
-
-/*
-for reference:
-var logColumns = []string{
-	"event_id", "command", "exit_code", "ts", "shell_pid", "shell_uptime", "cwd",
-	"prev_cwd", "user_name", "euid", "term", "hostname", "ssh_client",
-	"tty", "git_repo", "git_repo_root", "git_branch", "git_commit",
-	"git_status", "logged_successfully",
-}
-*/
-
-func randomLog() *domain.LogEntry {
-	return &domain.LogEntry{
-		EventID:   uuid.New().String(),
-		Command:   fmt.Sprintf("cmd-%d", rand.Intn(100)),
-		ExitCode:  rand.Int31n(10),
-		Timestamp: time.Now().UnixNano(),
-		Shell_PID: int32(rand.Intn(5000)),
-		// ShellUptime:          rand.Int63n(1000000),
-		WorkingDirectory: fmt.Sprintf("/tmp/dir-%d", rand.Intn(5)),
-		// PrevWorkingDirectory: "/" + uuid.New().String()[:8],
-		User: "user" + uuid.New().String()[:8],
-		EUID: int32(rand.Intn(1000)),
-		// Term:                 uuid.New().String()[:8],
-		// Hostname:             uuid.New().String()[:8],
-		// SSHClient:            "",
-		// TTY:                  fmt.Sprintf("pts/%d", rand.Intn(10)),
-		GitRepo: rand.Intn(2) == 0,
-		// GitRepoRoot:          "/" + uuid.New().String()[:8],
-		// GitBranch:            uuid.New().String()[:8],
-		// GitCommit:            uuid.New().String()[:8],
-		// GitStatus:            "clean",
-		// LoggedSuccessfully:   true,
-	}
-}
 
 func testLog(ctx context.Context, svc service.LogService, n int) []*domain.LogEntry {
 	var entries []*domain.LogEntry
@@ -85,20 +49,17 @@ func testLog(ctx context.Context, svc service.LogService, n int) []*domain.LogEn
 	})
 
 	for range n - 3 {
-		entries = append(entries, randomLog())
+		entries = append(entries, testutils.RandomLog())
 	}
 
-	for _, entry := range entries {
-		if err := svc.Log(ctx, entry); err != nil {
-			fmt.Printf("failed to log entry %v: %v\n", entry.Command, err)
-		}
+	if err := svc.Log(ctx, entries); err != nil {
+		fmt.Printf("failed to log entry: %v\n", err)
 	}
-
-	prettyPrint("log", entries, nil)
+	testutils.PrettyPrint("log", entries, nil)
 	return entries
 }
 
-func testGet(ctx context.Context, svc service.LogService) { // can't make working test without getting logs first
+func testGet(ctx context.Context, svc service.LogService) {
 	filter := domain.NewFilterBuilder().
 		AddSearchTerm("command", "pwd").
 		Build()
@@ -107,7 +68,7 @@ func testGet(ctx context.Context, svc service.LogService) { // can't make workin
 		log.Fatalf("couldn't get pwd dummy command: %v", err)
 	}
 	entry, err := svc.Get(ctx, entries[0].EventID)
-	prettyPrint("get", []*domain.LogEntry{entry}, err)
+	testutils.PrettyPrint("get", []*domain.LogEntry{entry}, err)
 }
 
 func testList(ctx context.Context, svc service.LogService) {
@@ -115,13 +76,13 @@ func testList(ctx context.Context, svc service.LogService) {
 		AddFilterTerm("exit_code", "0").
 		Build()
 	entries1, err := svc.List(ctx, filter1)
-	prettyPrint("list 1", entries1, err)
+	testutils.PrettyPrint("list 1", entries1, err)
 
 	filter2 := domain.NewFilterBuilder().
 		AddSearchTerm("command", "git status").
 		Build()
 	entries2, err := svc.List(ctx, filter2)
-	prettyPrint("list 2", entries2, err)
+	testutils.PrettyPrint("list 2", entries2, err)
 }
 
 func testDelete(ctx context.Context, svc service.LogService) {
@@ -133,7 +94,7 @@ func testDelete(ctx context.Context, svc service.LogService) {
 		log.Fatalf("couldn't get pwd dummy command: %v", err)
 	}
 	deleted, err := svc.Delete(ctx, entries[0].EventID)
-	prettyPrint("delete", []*domain.LogEntry{deleted}, err)
+	testutils.PrettyPrint("delete", []*domain.LogEntry{deleted}, err)
 }
 
 func testDeleteMultiple(ctx context.Context, svc service.LogService) {
@@ -146,32 +107,20 @@ func testDeleteMultiple(ctx context.Context, svc service.LogService) {
 	if err != nil {
 		log.Printf("testDeleteMultiple failed: %v", err)
 	}
-	prettyPrint("delete multiple", deleted, err)
-}
-
-func prettyPrint(testName string, entries []*domain.LogEntry, err error) {
-	width := 80
-	label := fmt.Sprintf(" Test: %s ", testName)
-
-	left := (width - len(label)) / 2
-	right := width - len(label) - left
-
-	fmt.Printf("%s%s%s\n", strings.Repeat("-", left), label, strings.Repeat("-", right))
-
-	if err != nil {
-		fmt.Printf("%v\n", err)
-	} else {
-		for _, e := range entries {
-			utils.PrintLogEntry(e)
-		}
-	}
-
-	fmt.Println(strings.Repeat("-", width))
+	testutils.PrettyPrint("delete multiple", deleted, err)
 }
 
 func main() {
 
-	testSVC := service.NewLogService(utils.GetLocalRepo(true))
+	local, err := database.GetLocalRepo(utils.GetCachePath())
+	if err != nil {
+		log.Fatalf("couldn't init local repo: %v", err)
+	}
+	// remote, err := database.GetRemoteRepo(utils.GetTestDSN())
+	// if err != nil {
+	// 	log.Fatalf("couldn't init remote repo: %v", err)
+	// }
+	testSVC := service.NewLogService(local)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

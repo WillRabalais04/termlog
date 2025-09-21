@@ -9,91 +9,68 @@ import (
 	"strings"
 
 	pb "github.com/WillRabalais04/terminalLog/api/gen"
-	"github.com/WillRabalais04/terminalLog/db"
-	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
-	"github.com/WillRabalais04/terminalLog/internal/core/domain"
+	"github.com/joho/godotenv"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-func GetLocalRepo(test bool) *database.LogRepo {
-	var cachePath string
-	if test {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			log.Fatalf("could not get home dir: %v", err)
-		}
-		cachePath = filepath.Join(GetProjectRoot(homeDir), "cmd", "test", "logs", "cache.db")
-	}
-
-	cache, err := database.NewRepo(&database.Config{
-		Driver:       "sqlite3",
-		DataSource:   cachePath,
-		SchemaString: db.SqliteSchema,
-	})
+func LoadEnv() {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Printf("could not init cache repo (sqlite): %v", err)
-		os.Exit(1)
+		log.Fatalf("failed to get home directory: %v", err)
 	}
-	return cache
+	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
+		log.Println("no .env found, using system env vars")
+	}
 }
 
-func GetRemoteRepo(test bool) *database.LogRepo {
-	var dataSource string
-	if test {
-		dataSource = GetTestDSN()
-	} else {
-		dataSource = GetDSN()
-	}
-	remote, err := database.NewRepo(&database.Config{
-		Driver:       "pgx",
-		DataSource:   dataSource,
-		SchemaString: db.PostgresSchema,
-	})
+func GetAppCachePath() string {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("could not init remote repo (postgres): %v", err)
+		log.Printf("error: could not get home dir: %v", err)
+		return "cache.db" // keep logs in current directory worst case scenario
 	}
-	return remote
-}
-func GetMultiRepo(test bool) *database.MultiRepo {
-	return database.NewMultiRepo(GetLocalRepo(test), GetRemoteRepo(test))
+	defaultPath := filepath.Join(homeDir, ".termlogger", "cache.db")
+	return GetEnvOrDefault("CACHE_PATH", defaultPath)
 }
 
-// func LoadEnv() {
-// 	homeDir, err := os.UserHomeDir()
-// 	if err != nil {
-// 		log.Fatalf("failed to get home directory: %v", err)
-// 	}
-// 	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
-// 		log.Println("no .env found, using system env vars")
-// 	}
-// }
+func GetDSN(db string) string {
+	var host, port, user, password, dbname, sslmode string
+	switch db {
+	case "main":
+		host = GetEnvOrDefault("DB_HOST", "db")
+		port = GetEnvOrDefault("DB_PORT", "5432")
+		user = GetEnvOrDefault("DB_USER", "postgres")
+		password = GetEnvOrDefault("DB_PASSWORD", "password")
+		dbname = GetEnvOrDefault("DB_NAME", "logs")
+		sslmode = GetEnvOrDefault("DB_SSLMODE", "disable")
+	case "test":
+		host = GetEnvOrDefault("TEST_DB_HOST", "localhost")
+		port = GetEnvOrDefault("TEST_DB_PORT", "5434")
+		user = GetEnvOrDefault("TEST_DB_USER", "test")
+		password = GetEnvOrDefault("TEST_DB_PASSWORD", "test")
+		dbname = GetEnvOrDefault("TEST_DB_NAME", "test_logs")
+		sslmode = GetEnvOrDefault("TEST_DB_SSLMODE", "disable")
+	case "unit_test":
+		host = GetEnvOrDefault("UNIT_TEST_DB_HOST", "localhost")
+		port = GetEnvOrDefault("UNIT_TEST_DB_PORT", "5435")
+		user = GetEnvOrDefault("UNIT_TEST_DB_USER", "test")
+		password = GetEnvOrDefault("UNIT_TEST_DB_PASSWORD", "test")
+		dbname = GetEnvOrDefault("UNIT_TEST_DB_NAME", "unit_test_logs")
+		sslmode = GetEnvOrDefault("UNIT_TEST_DB_SSLMODE", "disable")
+	default:
+		log.Fatal("invalid database provided for DSN string generation")
+	}
 
-func GetDSN() string {
-	host := GetEnvOrDefault("DB_HOST", "localhost")
-	port := GetEnvOrDefault("DB_PORT", "5432")
-	user := GetEnvOrDefault("DB_USER", "postgres")
-	password := GetEnvOrDefault("DB_PASSWORD", "password")
-	dbname := GetEnvOrDefault("DB_NAME", "terminallog")
-	sslmode := GetEnvOrDefault("DB_SSLMODE", "disable")
-
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		host, port, user, password, dbname, sslmode)
-
-	return dsn
 }
 
-func GetTestDSN() string {
-	host := GetEnvOrDefault("TEST_DB_HOST", "localhost")
-	port := GetEnvOrDefault("TEST_DB_PORT", "5434")
-	user := GetEnvOrDefault("TEST_DB_USER", "test")
-	password := GetEnvOrDefault("TEST_DB_PASSWORD", "test")
-	dbname := GetEnvOrDefault("TEST_DB_NAME", "test_logs")
-	sslmode := GetEnvOrDefault("DB_SSLMODE", "disable")
-
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		host, port, user, password, dbname, sslmode)
-
-	return dsn
+func GetCachePath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("could not get home dir: %v", err)
+	}
+	return filepath.Join(GetProjectRoot(homeDir), "cmd", "test", "logs", "cache.db")
 }
 
 func GetEnvOrDefault(key, defaultVal string) string {
@@ -105,7 +82,7 @@ func GetEnvOrDefault(key, defaultVal string) string {
 
 func LogJSON(newEntry *pb.LogEntry, projectDir string) {
 
-	testLogFile := filepath.Join(projectDir, "cmd", "test", "logs", "logs.json")
+	testLogFile := filepath.Join(projectDir, "test", "logs", "logs.json")
 
 	err := WriteToJSON(newEntry, testLogFile)
 	if err != nil {
@@ -146,8 +123,8 @@ func WriteToJSON(entry *pb.LogEntry, path string) error {
 		EmitUnpopulated: true,
 	}
 
-	for _, e := range entries {
-		jsonData, err := m.Marshal(e)
+	for _, entry := range entries {
+		jsonData, err := m.Marshal(entry)
 		if err != nil {
 			return err
 		}
@@ -169,29 +146,4 @@ func GetProjectRoot(homeDir string) string {
 		log.Fatalf("failed to read project root config: %v", err)
 	}
 	return strings.TrimSpace(string(projectRootBytes))
-}
-
-func PrintLogEntry(entry *domain.LogEntry) {
-
-	fmt.Printf("LogEntry: {\n")
-	fmt.Printf("EventID:		%s\n", entry.EventID)
-	fmt.Printf("Command:		%s\n", entry.Command)
-	fmt.Printf("ExitCode:		%d\n", entry.ExitCode)
-	fmt.Printf("Timestamp:		%d\n", entry.Timestamp)
-	fmt.Printf("Shell_PID:		%d\n", entry.Shell_PID)
-	fmt.Printf("ShellUptime:	%d\n", entry.ShellUptime)
-	fmt.Printf("WorkingDirectory:		%s\n", entry.WorkingDirectory)
-	fmt.Printf("PrevWorkingDirectory:		%s\n", entry.PrevWorkingDirectory)
-	fmt.Printf("User:		%s\n", entry.User)
-	fmt.Printf("EUID:		%d\n", entry.EUID)
-	fmt.Printf("Term:		%s\n", entry.Term)
-	fmt.Printf("Hostname:		%s\n", entry.Hostname)
-	fmt.Printf("TTY:		%s\n", entry.TTY)
-	fmt.Printf("GitRepo:		%t\n", entry.GitRepo)
-	fmt.Printf("GitRepoRoot:		%s\n", entry.GitRepoRoot)
-	fmt.Printf("GitBranch:		%s\n", entry.GitBranch)
-	fmt.Printf("GitCommit:		%s\n", entry.GitCommit)
-	fmt.Printf("GitStatus:		%s\n", entry.GitStatus)
-	fmt.Printf("LoggedSuccessfully:		%t\n", entry.LoggedSuccessfully)
-	fmt.Println("}")
 }

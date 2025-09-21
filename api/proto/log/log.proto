@@ -62,47 +62,50 @@ message LogFilter {
 }
 
 message LogRequest {
-  LogEntry entry = 1;
+  repeated LogEntry entries = 1;
 }
 
 message LogResponse {
   bool success = 1;
-  string event_id = 2;
+  repeated string event_ids = 2;
 }
 
-message GetLogRequest {
+message GetRequest {
+  string event_id = 1;
+}
+message GetResponse {
   string event_id = 1;
 }
 
-message ListLogsRequest {
+message ListRequest {
   LogFilter filter = 1;
 }
 
-message ListLogsResponse {
+message ListResponse {
   repeated LogEntry logs = 1;
 }
 
-message DeleteLogRequest {
+message DeleteRequest {
   string event_id = 1;
 }
 
-message DeleteLogResponse {
+message DeleteResponse {
   bool success = 1;
   LogEntry deleted = 2;
 }
 
-message DeleteMultipleLogsRequest {
+message DeleteMultipleRequest {
   LogFilter filter = 1;
 }
-message DeleteMultipleLogsResponse {
+message DeleteMultipleResponse {
   bool success = 1;
   repeated LogEntry deleted = 2;
 }
 
 service LogService {
   rpc Log(LogRequest) returns (LogResponse);
-  rpc GetLog(GetLogRequest) returns (LogEntry);
-  rpc ListLogs(ListLogsRequest) returns (ListLogsResponse);
-  rpc DeleteLog(DeleteLogRequest) returns (DeleteLogResponse);
-  rpc DeleteMultipleLogs(DeleteMultipleLogsRequest) returns (DeleteMultipleLogsResponse);
+  rpc Get(GetRequest) returns (LogEntry);
+  rpc List(ListRequest) returns (ListResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc DeleteMultiple(DeleteMultipleRequest) returns (DeleteMultipleResponse);
 }

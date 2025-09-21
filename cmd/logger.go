@@ -5,19 +5,21 @@ import (
 	"flag"
 	"log"
 	"os"
-	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/WillRabalais04/terminalLog/cmd/utils"
 	"github.com/WillRabalais04/terminalLog/db"
 	"github.com/WillRabalais04/terminalLog/internal/adapters/database"
-	grpcutils "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
+	grpcAdapter "github.com/WillRabalais04/terminalLog/internal/adapters/grpc"
 	"github.com/WillRabalais04/terminalLog/internal/core/domain"
-	"github.com/WillRabalais04/terminalLog/internal/core/service"
-	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
+
+	utils.LoadEnv()
 
 	cmd := flag.String("cmd", "", "Command executed")
 	exit := flag.Int("exit", 0, "Exit code of command")
@@ -67,50 +69,51 @@ func main() {
 		log.Fatal("unsuccessfully logged")
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("failed to get home directory: %v", err)
-	}
-	if err := godotenv.Load(filepath.Join(homeDir, ".termlogger", ".env")); err != nil {
-		log.Println("no .env found, using system env vars")
-	}
-
-	cachePath := utils.GetEnvOrDefault("LOG_DIR", filepath.Join(homeDir, ".termlogger", "cache.db"))
-
-	cache, err := database.NewRepo(&database.Config{
-		Driver:       "sqlite3",
+	// setting up local repo (main db in app mode, temporary cache in org mode)
+	cachePath := utils.GetAppCachePath()
+	localRepo, err := database.NewRepo(&database.Config{
+		Driver:       "sqlite",
 		DataSource:   cachePath,
 		SchemaString: db.SqliteSchema,
 	})
 	if err != nil {
 		log.Printf("could not init cache repo (sqlite): %v", err)
-		os.Exit(1)
+		return
 	}
-
-	mode := os.Getenv("APP_MODE")
-
-	var svc *service.LogService
-
-	if mode == "org" {
-		remote, err := database.NewRepo(&database.Config{
-			Driver:       "pgx",
-			DataSource:   utils.GetDSN(),
-			SchemaString: db.PostgresSchema,
-		})
-		if err != nil {
-			log.Fatalf("could not init remote repo (postgres): %v", err)
-		}
-		multiRepo := database.NewMultiRepo(cache, remote)
-		svc = service.NewLogService(multiRepo)
-	} else {
-		svc = service.NewLogService(cache)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	if err := localRepo.Log(ctx, []*domain.LogEntry{entry}); err != nil {
+		log.Printf("error: could not write to local cache: %v", err)
+	}
 
-	svc.Log(ctx, entry)
+	if os.Getenv("APP_MODE") == "org" {
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		go func() { // asynchronously flush cache and send to remote repo
+			defer wg.Done()
+			bgCtx, bgCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer bgCancel()
+
+			serverAddr := utils.GetEnvOrDefault("API_HOST_PORT", "localhost:9090")
+			conn, err := grpc.Dial(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				return // silently fail if server is offline leaving logs in cache
+			}
+			defer conn.Close()
+
+			remoteRepo := grpcAdapter.NewClientAdapter(conn)
+			multiRepo := database.NewMultiRepo(localRepo, remoteRepo)
+
+			if _, err := multiRepo.FlushCache(bgCtx); err != nil {
+				log.Printf("background flush failed: %v", err)
+			}
+		}()
+		wg.Wait()
+	}
+
 	if *jsonMode {
-		utils.LogJSON(grpcutils.LogEntryToProto(entry), utils.GetProjectRoot(homeDir)) // casting to proto for funsies
+		homeDir, _ := os.UserHomeDir()
+		utils.LogJSON(grpcAdapter.LogEntryToProto(entry), utils.GetProjectRoot(homeDir))
 	}
 }

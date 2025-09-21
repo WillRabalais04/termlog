@@ -63,19 +63,23 @@ func NewFilterBuilder() *FilterBuilder {
 		filter: &LogFilter{
 			FilterTerms: make(map[string]FilterValues),
 			SearchTerms: make(map[string]SearchValues),
-			FilterMode:  OR,
+			FilterMode:  AND,
 			SearchMode:  OR,
 		},
 	}
 }
 
 func (b *FilterBuilder) AddFilterTerm(key string, values ...string) *FilterBuilder {
-	b.filter.FilterTerms[key] = FilterValues{Values: values}
+	existing := b.filter.FilterTerms[key]
+	existing.Values = append(existing.Values, values...)
+	b.filter.FilterTerms[key] = existing
 	return b
 }
 
 func (b *FilterBuilder) AddSearchTerm(key string, values ...string) *FilterBuilder {
-	b.filter.SearchTerms[key] = SearchValues{Values: values}
+	existing := b.filter.SearchTerms[key]
+	existing.Values = append(existing.Values, values...)
+	b.filter.SearchTerms[key] = existing
 	return b
 }
 

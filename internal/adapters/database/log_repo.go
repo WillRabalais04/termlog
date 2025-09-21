@@ -13,7 +13,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 var logColumns = []string{
@@ -52,6 +52,18 @@ var columnMetadata = map[string]struct {
 }
 
 var allowedOrderings map[string]struct{}
+var defaultOrdering = "ts"
+
+type Config struct {
+	Driver       string
+	DataSource   string
+	SchemaString string
+}
+
+type LogRepo struct {
+	db *sql.DB
+	sb sq.StatementBuilderType
+}
 
 func init() {
 	allowedOrderings = make(map[string]struct{}, len(logColumns))
@@ -60,33 +72,27 @@ func init() {
 	}
 }
 
-func convertValue(val string, targetType interface{}) (interface{}, error) {
-	switch targetType.(type) {
-	case string:
-		return val, nil
-	case int32:
-		i, err := strconv.ParseInt(val, 10, 32)
-		return int32(i), err
-	case int64:
-		return strconv.ParseInt(val, 10, 64)
-	case bool:
-		return strconv.ParseBool(val)
-	default:
-		return nil, fmt.Errorf("unsupported type: %T", targetType)
+func NewRepo(cfg *Config) (*LogRepo, error) {
+	db, err := InitDB(cfg.Driver, cfg.DataSource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init db: %v", err)
 	}
-}
 
-var defaultOrdering = "ts"
+	if _, err := db.Exec(cfg.SchemaString); err != nil {
+		return nil, fmt.Errorf("failed to execute schema: %w", err)
+	}
 
-type LogRepo struct {
-	db *sql.DB
-	sb sq.StatementBuilderType
-}
+	var placeholder sq.PlaceholderFormat
+	switch cfg.Driver {
+	case "pgx":
+		placeholder = sq.Dollar
+	case "sqlite":
+		placeholder = sq.Question
+	default:
+		return nil, fmt.Errorf("invalid db driver name (should pgx or sqlite3)")
+	}
 
-type Config struct {
-	Driver       string
-	DataSource   string
-	SchemaString string
+	return &LogRepo{db: db, sb: sq.StatementBuilder.PlaceholderFormat(placeholder)}, nil
 }
 
 func InitDB(driver, dataSource string) (*sql.DB, error) {
@@ -105,7 +111,7 @@ func InitDB(driver, dataSource string) (*sql.DB, error) {
 		db.SetMaxOpenConns(25) // arbitrary should think about more later
 		db.SetMaxIdleConns(25)
 		db.SetConnMaxLifetime(5 * time.Minute)
-	case "sqlite3":
+	case "sqlite":
 		db.SetMaxOpenConns(1)
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", driver)
@@ -114,66 +120,37 @@ func InitDB(driver, dataSource string) (*sql.DB, error) {
 	return db, nil
 }
 
-func NewRepo(cfg *Config) (*LogRepo, error) {
-	db, err := InitDB(cfg.Driver, cfg.DataSource)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init db: %v", err)
+func (r *LogRepo) Log(ctx context.Context, entries []*domain.LogEntry) error { // switched to batched logging for efficiency in pushing cache
+	if len(entries) == 0 {
+		return nil
 	}
 
-	if _, err := db.Exec(cfg.SchemaString); err != nil {
-		return nil, fmt.Errorf("failed to execute schema: %w", err)
-	}
+	query := r.sb.Insert("logs").Columns(logColumns...)
 
-	var placeholder sq.PlaceholderFormat
-	switch cfg.Driver {
-	case "pgx":
-		placeholder = sq.Dollar
-	case "sqlite3":
-		placeholder = sq.Question
-	default:
-		return nil, fmt.Errorf("invalid db driver name (should pgx or sqlite3)")
-	}
-
-	return &LogRepo{db: db, sb: sq.StatementBuilder.PlaceholderFormat(placeholder)}, nil
-}
-
-func (r *LogRepo) Log(ctx context.Context, entry *domain.LogEntry) error {
-	entry.EventID = uuid.New().String()
-	query := r.sb.Insert("logs").
-		Columns(logColumns...).
-		Values(
-			entry.EventID,
-			entry.Command,
-			entry.ExitCode,
-			entry.Timestamp,
-			entry.Shell_PID,
-			entry.ShellUptime,
-			entry.WorkingDirectory,
-			entry.PrevWorkingDirectory,
-			entry.User,
-			entry.EUID,
-			entry.Term,
-			entry.Hostname,
-			entry.SSHClient,
-			entry.TTY,
-			entry.GitRepo,
-			entry.GitRepoRoot,
-			entry.GitBranch,
-			entry.GitCommit,
-			entry.GitStatus,
-			entry.LoggedSuccessfully,
+	for _, entry := range entries {
+		if entry.EventID == "" {
+			entry.EventID = uuid.New().String()
+		}
+		query = query.Values(
+			entry.EventID, entry.Command, entry.ExitCode, entry.Timestamp,
+			entry.Shell_PID, entry.ShellUptime, entry.WorkingDirectory, entry.PrevWorkingDirectory,
+			entry.User, entry.EUID, entry.Term, entry.Hostname,
+			entry.SSHClient, entry.TTY, entry.GitRepo, entry.GitRepoRoot,
+			entry.GitBranch, entry.GitCommit, entry.GitStatus, entry.LoggedSuccessfully,
 		)
+	}
+
+	query = query.Suffix("ON CONFLICT(event_id) DO NOTHING") // prevent duplicates (idempotent)
 
 	sqlStr, args, err := query.ToSql()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build bulk insert query: %w", err)
 	}
 
-	_, err = r.db.Exec(sqlStr, args...)
+	_, err = r.db.ExecContext(ctx, sqlStr, args...)
 	return err
 }
 
-// switch to calling list and with a filter that has event_id=id, user access and limit = 1 (if faster)
 func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
 	filter := domain.NewFilterBuilder().
 		AddFilterTerm("event_id", id).
@@ -187,7 +164,6 @@ func (r *LogRepo) Get(ctx context.Context, id string) (*domain.LogEntry, error) 
 	if len(entries) != 1 {
 		return nil, fmt.Errorf("failed to get entry")
 	}
-
 	return entries[0], nil
 }
 
@@ -195,7 +171,6 @@ func (r *LogRepo) List(ctx context.Context, filter *domain.LogFilter) ([]*domain
 	query := sq.StatementBuilderType(r.sb.Select(logColumns...).From("logs"))
 	query = applyFilters(query, filter)
 	selectQuery := sq.SelectBuilder(query)
-
 	orderBy, orderDir := validateOrdering(filter.OrderBy)
 	selectQuery = selectQuery.OrderBy(fmt.Sprintf("%s %s", orderBy, orderDir))
 
@@ -239,17 +214,23 @@ func (r *LogRepo) Delete(ctx context.Context, id string) (*domain.LogEntry, erro
 		Build()
 	deletedEntries, err := r.DeleteMultiple(ctx, filter)
 
-	if len(deletedEntries) != 1 || err != nil {
-		return nil, fmt.Errorf("failed to get deleted entry: %v", err)
+	if err != nil {
+		return nil, fmt.Errorf("database error during delete: %w", err)
 	}
+	if len(deletedEntries) == 0 {
+		return nil, nil
+	}
+	if len(deletedEntries) > 1 {
+		return nil, fmt.Errorf("consistency error: multiple entries deleted for id %s", id)
+	}
+
 	return deletedEntries[0], nil
 }
 
 func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *domain.LogFilter) ([]*domain.LogEntry, error) {
 	query := sq.StatementBuilderType(r.sb.Delete("logs"))
 	query = applyFilters(query, filter)
-
-	sqlStr, args, err := (sq.DeleteBuilder(query)).Suffix("RETURNING " + strings.Join(logColumns, ", ")).ToSql()
+	sqlStr, args, err := (sq.DeleteBuilder(query)).Suffix("RETURNING *").ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build delete query: %w", err)
 	}
@@ -274,7 +255,6 @@ func (r *LogRepo) DeleteMultiple(ctx context.Context, filter *domain.LogFilter) 
 	}
 
 	return deletedEntries, nil
-
 }
 
 func applyFilters(builder sq.StatementBuilderType, filter *domain.LogFilter) sq.StatementBuilderType {
@@ -353,6 +333,41 @@ func applySearchTerms(builder sq.StatementBuilderType, searchTerms map[string]do
 	return builder
 }
 
+func convertValue(val string, targetType interface{}) (interface{}, error) {
+	switch targetType.(type) {
+	case string:
+		return val, nil
+	case int32:
+		i, err := strconv.ParseInt(val, 10, 32)
+		return int32(i), err
+	case int64:
+		return strconv.ParseInt(val, 10, 64)
+	case bool:
+		return strconv.ParseBool(val)
+	default:
+		return nil, fmt.Errorf("unsupported type: %T", targetType)
+	}
+}
+
+func validateOrdering(ordering *string) (string, string) {
+	orderDir := "DESC"
+	validatedOrdering := defaultOrdering
+
+	if ordering != nil {
+		derefedOrdering := strings.ToLower(*ordering)
+		if strings.HasPrefix(derefedOrdering, "-") {
+			derefedOrdering = strings.TrimPrefix(derefedOrdering, "-")
+			orderDir = "ASC"
+		}
+		metadata, ok := columnMetadata[derefedOrdering]
+		if ok && metadata.IsOrderable {
+			validatedOrdering = derefedOrdering
+		}
+	}
+
+	return validatedOrdering, orderDir
+}
+
 func scanLogEntry(scanner interface {
 	Scan(dest ...interface{}) error
 }) (*domain.LogEntry, error) {
@@ -385,23 +400,4 @@ func scanLogEntry(scanner interface {
 	}
 
 	return &entry, nil
-}
-
-func validateOrdering(ordering *string) (string, string) {
-	orderDir := "DESC"
-	validatedOrdering := defaultOrdering
-
-	if ordering != nil {
-		derefedOrdering := strings.ToLower(*ordering)
-		if strings.HasPrefix(derefedOrdering, "-") {
-			derefedOrdering = strings.TrimPrefix(derefedOrdering, "-")
-			orderDir = "ASC"
-		}
-		metadata, ok := columnMetadata[derefedOrdering]
-		if ok && metadata.IsOrderable {
-			validatedOrdering = derefedOrdering
-		}
-	}
-
-	return validatedOrdering, orderDir
 }

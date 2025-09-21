@@ -1,73 +1,76 @@
 services:
+  api:
+    build: .
+    ports:
+      - "${API_HOST_PORT}:9090"
+    environment:
+      - DSN=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=${DB_SSLMODE}
+      - LISTEN_PORT=${LISTEN_PORT}
+    depends_on:
+      db:
+        condition: service_healthy
   db:
     image: postgres:15
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: logs
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - logs-data:/var/lib/postgresql/data
     ports:
-      - "5433:5432" # get from env maybe
+      - "${DB_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   migrate:
     image: migrate/migrate
     volumes:
       - ./db/migrations/postgres:/migrations
-    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://postgres:password@db:5432/logs?sslmode=disable"]
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=${DB_SSLMODE}"]
     command: ["up"]
     depends_on:
       - db
   db-test:
     image: postgres:15
     environment:
-      POSTGRES_USER: test
-      POSTGRES_PASSWORD: test
-      POSTGRES_DB: test_logs
+      POSTGRES_USER: ${TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD}
+      POSTGRES_DB: ${TEST_DB_NAME}
     volumes:
       - logs-data-test:/var/lib/postgresql/data
     ports:
-      - "5434:5432"
+      - "${TEST_DB_PORT}:5432"
   migrate-test:
     image: migrate/migrate
     volumes:
       - ./db/migrations/postgres:/migrations
-    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://test:test@db-test:5432/test_logs?sslmode=disable"]
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://${TEST_DB_USER}:${TEST_DB_PASSWORD}@db-test:5432/${TEST_DB_NAME}?sslmode=${TEST_DB_SSLMODE}"]
     command: ["up"]
     depends_on:
       - db-test
-    
+  db-unit-tests:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ${UNIT_TEST_DB_USER}
+      POSTGRES_PASSWORD: ${UNIT_TEST_DB_PASSWORD}
+      POSTGRES_DB: ${UNIT_TEST_DB_NAME}
+    volumes:
+      - logs-data-unit-tests:/var/lib/postgresql/data
+    ports:
+      - "${UNIT_TEST_DB_PORT}:5432"
+
+  migrate-unit-tests:
+    image: migrate/migrate
+    volumes:
+      - ./db/migrations/postgres:/migrations
+    entrypoint: ["migrate", "-path", "/migrations", "-database", "postgres://${UNIT_TEST_DB_USER}:${UNIT_TEST_DB_PASSWORD}@db-unit-tests:5432/${UNIT_TEST_DB_NAME}?sslmode=${UNIT_TEST_DB_SSLMODE}"]
+    command: ["up"]
+    depends_on:
+      - db-unit-tests
+
 volumes:
   logs-data:
   logs-data-test:
-
-
-  # kafka: # will implement multi user mode with kafka later
-  #   image: apache/kafka:3.9.1
-  #   container_name: kafka
-  #   ports:
-  #     - "9092:9092"   # broker aka client
-  #     - "9093:9093"   # controller
-  #   environment:
-  #     KAFKA_NODE_ID: 1
-  #     KAFKA_PROCESS_ROLES: broker,controller
-  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-
-  #     KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-
-  #     KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
-
-  #     KAFKA_CLUSTER_ID: "my-cluster-id"
-    
-  #   volumes:
-  #     - ./data/kafka:/tmp/kraft-combined-logs
-  # api:
-  #   build: ./cmd
-  #   depends_on:
-  #     - db
-  #     - migrate
-  #   environment:
-  #     DATABASE_URL: postgres://postgres:password@db:5432/logs?sslmode=disable
-  #   ports:
-  #     - "8080:8080"
+  logs-data-unit-tests:

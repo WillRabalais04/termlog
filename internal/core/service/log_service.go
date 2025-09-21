@@ -16,8 +16,8 @@ func NewLogService(repo ports.LogRepositoryPort) *LogService {
 		repo: repo,
 	}
 }
-func (s *LogService) Log(ctx context.Context, entry *domain.LogEntry) error {
-	return s.repo.Log(ctx, entry)
+func (s *LogService) Log(ctx context.Context, entries []*domain.LogEntry) error {
+	return s.repo.Log(ctx, entries)
 }
 func (s *LogService) Get(ctx context.Context, id string) (*domain.LogEntry, error) {
 	return s.repo.Get(ctx, id)
